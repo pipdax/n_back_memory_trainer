@@ -1,0 +1,5 @@
+{
+  "name": "N-Back记忆训练",
+  "description": "An engaging, gamified memory training application for children and teens based on the N-Back cognitive task. Features customizable difficulty, diverse stimuli (images, shapes, colors, etc.), progress tracking, and an AI-powered resource generator to keep the challenges fresh.",
+  "requestFramePermissions": []
+}
