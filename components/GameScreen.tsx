@@ -241,53 +241,58 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
         <div className="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
       </div>
       
-      {showComboEffect && (
-          <div className="absolute top-40 left-0 right-0 flex justify-center pointer-events-none z-20">
-              <div className="text-6xl font-display text-orange-500 animate-bounce-in" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5), 0 0 10px #ff8c00' }}>
+      <div className="my-auto flex flex-col items-center justify-center w-full">
+        {/* Combo Animation Container - placed above the stimulus */}
+        <div className="h-20 flex items-end justify-center pointer-events-none z-20">
+          {showComboEffect && (
+              <div className="text-5xl md:text-6xl font-display text-orange-500 animate-bounce-in" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5), 0 0 10px #ff8c00' }}>
                   x{comboDisplay} 连击! 🔥
               </div>
-          </div>
-      )}
-
-      <div className="relative my-auto flex items-center justify-center h-64 w-full">
-        <div className={`transition-transform duration-500 ${gameState === 'over' ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}>
-          <StimulusDisplay stimulus={currentStimulus} turn={turn} />
+          )}
         </div>
         
-        {showReviewHistory && (
-            <div className="absolute inset-0 flex items-center justify-center z-20 animate-fade-in">
-                <div className="bg-white/95 backdrop-blur-sm border-2 border-red-400 text-red-800 p-4 sm:p-6 rounded-2xl shadow-2xl w-full max-w-lg">
-                    <p className="text-center text-lg font-bold mb-4">回顾 (最近 {settings.nLevel} 个)</p>
-                    <div className="flex justify-center items-center gap-4">
-                        {reviewStimuli.map((stim, index) => (
-                           <div 
-                             key={index} 
-                             style={{ width: `${reviewItemSize}px`, height: `${reviewItemSize}px` }}
-                             className="border-2 border-gray-300 rounded-lg overflow-hidden"
-                           >
-                               <MiniStimulusDisplay stimulus={stim} size={reviewItemSize} />
-                           </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        )}
-        
-        {gameState === 'over' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center animate-bounce-in text-center">
-            <h2 className="font-display text-4xl sm:text-5xl text-green-600">{getEndGameMessage()}</h2>
-            <p className="text-2xl mt-2">最终得分: {score}</p>
+        {/* Stimulus Container */}
+        <div className="relative flex items-center justify-center h-64 w-full">
+          <div className={`transition-transform duration-500 ${gameState === 'over' ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}>
+            <StimulusDisplay stimulus={currentStimulus} turn={turn} />
           </div>
-        )}
+          
+          {showReviewHistory && (
+              <div className="absolute inset-0 flex items-center justify-center z-20 animate-fade-in">
+                  <div className="bg-white/95 backdrop-blur-sm border-2 border-red-400 text-red-800 p-4 sm:p-6 rounded-2xl shadow-2xl w-full max-w-lg">
+                      <p className="text-center text-lg font-bold mb-4">回顾 (最近 {settings.nLevel} 个)</p>
+                      <div className="flex justify-center items-center gap-4">
+                          {reviewStimuli.map((stim, index) => (
+                             <div 
+                               key={index} 
+                               style={{ width: `${reviewItemSize}px`, height: `${reviewItemSize}px` }}
+                               className="border-2 border-gray-300 rounded-lg overflow-hidden"
+                             >
+                                 <MiniStimulusDisplay stimulus={stim} size={reviewItemSize} />
+                             </div>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+          )}
+          
+          {gameState === 'over' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center animate-bounce-in text-center">
+              <h2 className="font-display text-4xl sm:text-5xl text-green-600">{getEndGameMessage()}</h2>
+              <p className="text-2xl mt-2">最终得分: {score}</p>
+            </div>
+          )}
 
-        {feedback && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className={`rounded-full p-8 ${feedback === 'correct' ? 'bg-green-500/80' : 'bg-red-500/80'} animate-bounce-in`}>
-              {feedback === 'correct' ? <CheckIcon className="w-16 h-16 text-white" /> : <XIcon className="w-16 h-16 text-white" />}
+          {feedback && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className={`rounded-full p-8 ${feedback === 'correct' ? 'bg-green-500/80' : 'bg-red-500/80'} animate-bounce-in`}>
+                {feedback === 'correct' ? <CheckIcon className="w-16 h-16 text-white" /> : <XIcon className="w-16 h-16 text-white" />}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
 
       <div className={`grid grid-cols-2 gap-4 w-full max-w-sm mt-auto ${gameState !== 'playing' || showReviewHistory ? 'pointer-events-none opacity-50' : ''}`}>
         <button
