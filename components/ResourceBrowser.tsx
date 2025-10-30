@@ -17,8 +17,6 @@ const StimulusCard: React.FC<{ stimulus: Stimulus }> = ({ stimulus }) => {
     const nameClasses = "absolute bottom-1 right-2 text-xs font-semibold bg-black/50 text-white px-1.5 py-0.5 rounded";
 
     switch (stimulus.type) {
-        case StimulusType.IMAGE:
-            return <div className={`${baseClasses} bg-gray-200 relative`}><img src={stimulus.value} alt={stimulus.name} className="w-full h-full object-cover rounded-lg" /><span className={nameClasses}>{stimulus.name}</span></div>;
         case StimulusType.COLOR:
             return <div className={`${baseClasses} relative`} style={{ backgroundColor: stimulus.value }}><span className={nameClasses}>{stimulus.name}</span></div>;
         case StimulusType.EMOJI:
@@ -26,6 +24,7 @@ const StimulusCard: React.FC<{ stimulus: Stimulus }> = ({ stimulus }) => {
             return <div className={`${baseClasses} bg-white text-5xl relative`}><span className="text-5xl">{stimulus.value}</span><span className={nameClasses}>{stimulus.name}</span></div>;
         case StimulusType.NUMBER:
         case StimulusType.TEXT:
+        case StimulusType.LETTER:
             return <div className={`${baseClasses} bg-white text-5xl font-bold text-gray-800 relative`}><span className="truncate max-w-full px-2">{stimulus.value}</span><span className={nameClasses}>{stimulus.name}</span></div>;
         default:
             return <div className={baseClasses}></div>;
@@ -47,11 +46,11 @@ const categoryMap: { [key: string]: string } = {
 const stimulusTypeToChinese = (type: StimulusType): string => {
     switch (type) {
         case StimulusType.EMOJI: return '表情';
-        case StimulusType.IMAGE: return '图片';
         case StimulusType.SHAPE: return '形状与符号';
         case StimulusType.COLOR: return '颜色';
         case StimulusType.NUMBER: return '数字';
         case StimulusType.TEXT: return '文字';
+        case StimulusType.LETTER: return '字母';
         default: return '未知';
     }
 };
@@ -72,9 +71,7 @@ const ResourceBrowser: React.FC<ResourceBrowserProps> = ({ resources, setResourc
         id: uuidv4(),
         type: item.type as StimulusType,
         name: item.name,
-        value: item.type === 'IMAGE' 
-          ? `https://picsum.photos/seed/${item.name.replace(/\s+/g, '-')}/200`
-          : item.emoji || item.name,
+        value: item.emoji || item.name,
       }));
 
       const existingNames = new Set(resources.map(r => r.name));
@@ -102,11 +99,11 @@ const ResourceBrowser: React.FC<ResourceBrowserProps> = ({ resources, setResourc
 
   const orderedTypes = [
     StimulusType.EMOJI,
-    StimulusType.IMAGE,
     StimulusType.SHAPE,
     StimulusType.COLOR,
     StimulusType.NUMBER,
     StimulusType.TEXT,
+    StimulusType.LETTER,
   ];
 
   return (

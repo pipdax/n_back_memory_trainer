@@ -56,10 +56,11 @@ const textData = [
     '苹果', '香蕉', '橙子', '草莓', '葡萄', '西瓜', '桃子', '菠萝', '芒果', '樱桃', '桌子', '椅子', '床', '灯', '门', '窗户', '电视', '电脑', '手机', '书', '笔', '尺子', '橡皮', '书包', '杯子', '碗', '筷子', '勺子', '盘子', '锅', '爸爸', '妈妈', '哥哥', '姐姐', '弟弟', '妹妹', '爷爷', '奶奶', '老师', '同学', '朋友', '医生', '护士', '警察', '司机', '工人', '农民', '猫', '狗', '鸟', '鱼', '兔子', '马', '牛', '羊', '猪', '鸡', '鸭', '鹅', '太阳', '月亮', '星星', '云', '雨', '雪', '风', '山', '水', '火', '土', '木', '天', '地', '人', '头', '脸', '眼睛', '鼻子', '嘴巴', '耳朵', '手', '脚', '身体', '头发', '红色', '黄色', '蓝色', '绿色', '白色', '黑色', '紫色', '粉色', '橙色', '灰色', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '百', '千', '万', '大', '小', '多', '少', '上', '下', '左', '右', '前', '后', '里', '外', '吃', '喝', '玩', '看', '听', '说', '读', '写', '走', '跑', '跳', '飞', '游泳', '唱歌', '跳舞', '画画', '学习', '睡觉', '起床', '穿衣', '洗脸', '刷牙', '吃饭', '回家', '去学校', '高兴', '开心', '难过', '生气', '害怕', '哭', '笑', '爱', '喜欢', '讨厌', '谢谢', '不客气', '对不起', '没关系', '你好', '再见', '早上好', '晚上好', '春天', '夏天', '秋天', '冬天', '今天', '明天', '昨天', '年', '月', '日', '小时', '分钟', '秒', '快', '慢', '冷', '热', '饿', '渴', '累', '忙', '好', '坏', '对', '错', '是', '不', '有', '没有', '在', '的', '我', '你', '他', '她', '它', '我们', '你们', '他们', '什么', '谁', '哪里', '为什么', '怎么样', '几', '多少', '飞机', '火车', '汽车', '自行车', '船', '火箭', '公园', '学校', '医院', '商店', '家', '厨房', '客厅', '卧室', '卫生间', '花园', '足球', '篮球', '乒乓球', '玩具', '娃娃', '积木', '气球', '礼物', '花', '草', '树',
 ].map(word => ({ value: word, name: word }));
 
-// Images (Seeds for Picsum Photos, ~250)
-const imageData = [
-    { seed: 'apple', name: '苹果' }, { seed: 'ball', name: '球' }, { seed: 'car', name: '汽车' }, { seed: 'house', name: '房子' }, { seed: 'tree', name: '树' }, { seed: 'sun', name: '太阳' }, { seed: 'moon', name: '月亮' }, { seed: 'star', name: '星星' }, { seed: 'book', name: '书' }, { seed: 'pen', name: '笔' }, { seed: 'dog', name: '狗' }, { seed: 'cat', name: '猫' }, { seed: 'bird', name: '鸟' }, { seed: 'fish', name: '鱼' }, { seed: 'flower', name: '花' }, { seed: 'chair', name: '椅子' }, { seed: 'table', name: '桌子' }, { seed: 'bed', name: '床' }, { seed: 'door', name: '门' }, { seed: 'window', name: '窗' }, { seed: 'boat', name: '船' }, { seed: 'train', name: '火车' }, { seed: 'plane', name: '飞机' }, { seed: 'bicycle', name: '自行车' }, { seed: 'bus', name: '公共汽车' }, { seed: 'computer', name: '电脑' }, { seed: 'phone', name: '手机' }, { seed: 'television', name: '电视' }, { seed: 'hat', name: '帽子' }, { seed: 'shoes', name: '鞋子' }, { seed: 'shirt', name: '衬衫' }, { seed: 'pants', name: '裤子' }, { seed: 'key', name: '钥匙' }, { seed: 'lock', name: '锁' }, { seed: 'clock', name: '时钟' }, { seed: 'watch', name: '手表' }, { seed: 'bread', name: '面包' }, { seed: 'milk', name: '牛奶' }, { seed: 'water', name: '水' }, { seed: 'juice', name: '果汁' }, { seed: 'rice', name: '米饭' }, { seed: 'egg', name: '鸡蛋' }, { seed: 'cake', name: '蛋糕' }, { seed: 'cookie', name: '饼干' }, { seed: 'ice-cream', name: '冰淇淋' }, { seed: 'pizza', name: '披萨' }, { seed: 'burger', name: '汉堡' }, { seed: 'fries', name: '薯条' }, { seed: 'boy', name: '男孩' }, { seed: 'girl', name: '女孩' }, { seed: 'baby', name: '婴儿' }, { seed: 'man', name: '男人' }, { seed: 'woman', name: '女人' }, { seed: 'king', name: '国王' }, { seed: 'queen', name: '女王' }, { seed: 'prince', name: '王子' }, { seed: 'princess', name: '公主' }, { seed: 'doctor', name: '医生' }, { seed: 'nurse', name: '护士' }, { seed: 'teacher', name: '老师' }, { seed: 'student', name: '学生' }, { seed: 'police', name: '警察' }, { seed: 'firefighter', name: '消防员' }, { seed: 'astronaut', name: '宇航员' }, { seed: 'pilot', name: '飞行员' }, { seed: 'chef', name: '厨师' }, { seed: 'artist', name: '艺术家' }, { seed: 'musician', name: '音乐家' }, { seed: 'farmer', name: '农民' }, { seed: 'lion', name: '狮子' }, { seed: 'tiger', name: '老虎' }, { seed: 'bear', name: '熊' }, { seed: 'monkey', name: '猴子' }, { seed: 'elephant', name: '大象' }, { seed: 'giraffe', name: '长颈鹿' }, { seed: 'zebra', name: '斑马' }, { seed: 'snake', name: '蛇' }, { seed: 'turtle', name: '乌龟' }, { seed: 'frog', name: '青蛙' }, { seed: 'butterfly', name: '蝴蝶' }, { seed: 'bee', name: '蜜蜂' }, { seed: 'ant', name: '蚂蚁' }, { seed: 'spider', name: '蜘蛛' }, { seed: 'ladybug', name: '瓢虫' }, { seed: 'ocean', name: '海洋' }, { seed: 'river', name: '河流' }, { seed: 'lake', name: '湖' }, { seed: 'mountain', name: '山' }, { seed: 'forest', name: '森林' }, { seed: 'desert', name: '沙漠' }, { seed: 'island', name: '岛屿' }, { seed: 'city', name: '城市' }, { seed: 'village', name: '村庄' }, { seed: 'castle', name: '城堡' }, { seed: 'bridge', name: '桥' }, { seed: 'road', name: '路' }, { seed: 'sky', name: '天空' }, { seed: 'cloud', name: '云' }, { seed: 'rain', name: '雨' }, { seed: 'snow', name: '雪' }, { seed: 'wind', name: '风' }, { seed: 'fire', name: '火' }, { seed: 'earth', name: '地球' }, { seed: 'space', name: '太空' }, { seed: 'rocket', name: '火箭' }, { seed: 'planet', name: '行星' },
-];
+// Letters (26)
+const letterData = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(char => ({
+    value: char,
+    name: `字母 ${char}`,
+}));
 
 // Map all data to the Stimulus format
 const emojis = emojiData.map(e => ({ id: uuidv4(), type: StimulusType.EMOJI, ...e }));
@@ -67,7 +68,7 @@ const colors = colorData.map(c => ({ id: uuidv4(), type: StimulusType.COLOR, val
 const shapes = shapeData.map(s => ({ id: uuidv4(), type: StimulusType.SHAPE, ...s }));
 const numbers = numberData.map(n => ({ id: uuidv4(), type: StimulusType.NUMBER, ...n }));
 const texts = textData.map(t => ({ id: uuidv4(), type: StimulusType.TEXT, ...t }));
-const images = imageData.map(i => ({ id: uuidv4(), type: StimulusType.IMAGE, value: `https://picsum.photos/seed/${i.seed}/200`, name: i.name }));
+const letters = letterData.map(l => ({ id: uuidv4(), type: StimulusType.LETTER, ...l }));
 
 export const INITIAL_RESOURCES: Stimulus[] = [
   ...emojis,
@@ -75,6 +76,6 @@ export const INITIAL_RESOURCES: Stimulus[] = [
   ...shapes,
   ...numbers,
   ...texts,
-  ...images,
+  ...letters,
 ];
 // --- END OF EXPANDED RESOURCES ---

@@ -22,12 +22,12 @@ interface StartScreenProps {
 
 const stimulusTypeToChinese = (type: StimulusType) => {
     const map = {
-      [StimulusType.IMAGE]: '图片',
       [StimulusType.EMOJI]: '表情',
       [StimulusType.COLOR]: '颜色',
       [StimulusType.SHAPE]: '形状',
       [StimulusType.NUMBER]: '数字',
       [StimulusType.TEXT]: '文字',
+      [StimulusType.LETTER]: '字母',
       [StimulusType.RANDOM]: '随机',
     };
     return map[type] || type;

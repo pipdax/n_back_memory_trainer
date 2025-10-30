@@ -10,13 +10,13 @@ interface SettingsScreenProps {
   onBack: () => void;
 }
 
-const stimulusTypeMap: { [key in StimulusType]: string } = {
-    [StimulusType.IMAGE]: '图片',
+const stimulusTypeMap: { [key in StimulusType]?: string } = {
     [StimulusType.EMOJI]: '表情',
     [StimulusType.COLOR]: '颜色',
     [StimulusType.SHAPE]: '形状',
     [StimulusType.NUMBER]: '数字',
     [StimulusType.TEXT]: '文字',
+    [StimulusType.LETTER]: '字母',
     [StimulusType.RANDOM]: '随机',
 };
 

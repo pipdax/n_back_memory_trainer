@@ -24,8 +24,6 @@ const StimulusDisplay: React.FC<{ stimulus: Stimulus | null, turn: number }> = R
       <div key={turn}>
         {(() => {
           switch (stimulus.type) {
-              case StimulusType.IMAGE:
-                  return <img src={stimulus.value} alt={stimulus.name} className={`${baseClasses} object-cover bg-white`} />;
               case StimulusType.COLOR:
                   return <div className={baseClasses} style={{ backgroundColor: stimulus.value }}></div>;
               case StimulusType.EMOJI:
@@ -33,6 +31,7 @@ const StimulusDisplay: React.FC<{ stimulus: Stimulus | null, turn: number }> = R
                   return <div className={`${baseClasses} bg-white text-8xl sm:text-9xl`}>{stimulus.value}</div>;
               case StimulusType.NUMBER:
               case StimulusType.TEXT:
+              case StimulusType.LETTER:
                   return <div className={`${baseClasses} bg-white text-8xl sm:text-9xl font-bold text-gray-800`}>{stimulus.value}</div>;
               default:
                   return <div className={baseClasses}></div>;
@@ -52,8 +51,6 @@ const MiniStimulusDisplay: React.FC<{ stimulus: Stimulus | null; size: number; }
     };
 
     switch (stimulus.type) {
-        case StimulusType.IMAGE:
-            return <img src={stimulus.value} alt={stimulus.name ?? ''} className={`${baseClasses} object-cover bg-white`} />;
         case StimulusType.COLOR:
             return <div className={baseClasses} style={{ backgroundColor: stimulus.value }}></div>;
         case StimulusType.EMOJI:
@@ -61,6 +58,7 @@ const MiniStimulusDisplay: React.FC<{ stimulus: Stimulus | null; size: number; }
             return <div className={`${baseClasses} bg-white`} style={dynamicStyle}>{stimulus.value}</div>;
         case StimulusType.NUMBER:
         case StimulusType.TEXT:
+        case StimulusType.LETTER:
             return <div className={`${baseClasses} bg-white font-bold text-gray-800`} style={dynamicStyle}>{stimulus.value}</div>;
         default:
             return <div className={baseClasses}></div>;

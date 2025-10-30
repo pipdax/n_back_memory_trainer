@@ -8,12 +8,12 @@ export enum Screen {
 }
 
 export enum StimulusType {
-  IMAGE = 'IMAGE',
   EMOJI = 'EMOJI',
   COLOR = 'COLOR',
   SHAPE = 'SHAPE',
   NUMBER = 'NUMBER',
   TEXT = 'TEXT',
+  LETTER = 'LETTER',
   RANDOM = 'RANDOM',
 }
 
