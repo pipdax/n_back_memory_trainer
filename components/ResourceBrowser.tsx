@@ -9,6 +9,7 @@ interface ResourceBrowserProps {
   resources: Stimulus[];
   setResources: React.Dispatch<React.SetStateAction<Stimulus[]>>;
   onBack: () => void;
+  onAIFetch: () => void;
 }
 
 const StimulusCard: React.FC<{ stimulus: Stimulus }> = ({ stimulus }) => {
@@ -55,7 +56,7 @@ const stimulusTypeToChinese = (type: StimulusType): string => {
     }
 };
 
-const ResourceBrowser: React.FC<ResourceBrowserProps> = ({ resources, setResources, onBack }) => {
+const ResourceBrowser: React.FC<ResourceBrowserProps> = ({ resources, setResources, onBack, onAIFetch }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('animals');
@@ -80,6 +81,7 @@ const ResourceBrowser: React.FC<ResourceBrowserProps> = ({ resources, setResourc
       const filteredNewStimuli = newStimuli.filter(s => !existingNames.has(s.name || ''));
       
       setResources(prev => [...prev, ...filteredNewStimuli]);
+      onAIFetch();
     } catch (err) {
       setError((err as Error).message || '获取新资源失败，请重试。');
       console.error(err);

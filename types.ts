@@ -4,6 +4,7 @@ export enum Screen {
   SETTINGS,
   GAME,
   RESOURCES,
+  ACHIEVEMENTS,
 }
 
 export enum StimulusType {
@@ -29,4 +30,25 @@ export interface GameSettings {
   stimulusType: StimulusType;
   gameLength: number; // Number of turns
   speed: number; // ms per turn
+}
+
+export type AchievementType = 'score' | 'streak' | 'levelComplete' | 'precision' | 'action' | 'generic';
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  type: AchievementType;
+  goal: number | ((stats: GameStats) => boolean); // e.g., score to reach, streak length, or a custom function
+}
+
+export type UnlockedAchievements = Record<string, string>; // key: achievementId, value: ISO date string
+
+export interface GameStats {
+    score: number;
+    settings: GameSettings;
+    maxStreak: number;
+    incorrectPresses: number;
+    gameCompleted: boolean;
 }

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { GameSettings, Stimulus } from '../types';
+import { GameSettings, Stimulus, GameStats } from '../types';
 
 interface UseGameLogicProps {
     settings: GameSettings;
     stimuli: Stimulus[];
-    onResponse: (correct: boolean) => void;
+    onResponse: (correct: boolean, comboCount: number) => void;
     isPaused: boolean;
 }
 
@@ -19,6 +19,15 @@ export const useGameLogic = ({ settings, stimuli, onResponse, isPaused }: UseGam
     const [showReviewHistory, setShowReviewHistory] = useState(false);
     const [lastResult, setLastResult] = useState<TurnResult>('neutral');
     const [scoreHistory, setScoreHistory] = useState<Array<{ turn: number; score: number; result: TurnResult }>>([{ turn: 0, score: 0, result: 'neutral' }]);
+
+    // Stats for achievements
+    const [currentStreak, setCurrentStreak] = useState(0);
+    const [maxStreak, setMaxStreak] = useState(0);
+    const [incorrectPresses, setIncorrectPresses] = useState(0);
+    
+    const basePoints = useMemo(() => 10 * Math.pow(2, settings.nLevel - 1), [settings.nLevel]);
+    const penalty = useMemo(() => Math.ceil(basePoints / 2), [basePoints]);
+
 
     const gameSequence = useMemo(() => {
         if (stimuli.length === 0) return [];
@@ -39,10 +48,6 @@ export const useGameLogic = ({ settings, stimuli, onResponse, isPaused }: UseGam
     const advanceTurn = useCallback(() => {
         if (isGameOver) return;
 
-        if (turn < settings.nLevel) {
-            setLastResult('neutral');
-        }
-
         setHistory(h => [...h, gameSequence[turn]]);
         if (turn < settings.gameLength - 1) {
             setTurn(t => t + 1);
@@ -50,34 +55,48 @@ export const useGameLogic = ({ settings, stimuli, onResponse, isPaused }: UseGam
         } else {
             setIsGameOver(true);
         }
-    }, [turn, settings.gameLength, isGameOver, gameSequence, settings.nLevel]);
+    }, [turn, settings.gameLength, isGameOver, gameSequence]);
+    
+    useEffect(() => {
+        if (currentStreak > maxStreak) {
+            setMaxStreak(currentStreak);
+        }
+    }, [currentStreak, maxStreak]);
 
     useEffect(() => {
-        if (isPaused || isGameOver || userResponded || stimuli.length === 0) {
+        if (isPaused || isGameOver || stimuli.length === 0) {
             return;
         }
 
-        const handleNoResponse = () => {
-            if (turn < settings.nLevel) {
-                advanceTurn();
-                return;
+        const actualMatch = turn >= settings.nLevel && gameSequence[turn]?.id === gameSequence[turn - settings.nLevel]?.id;
+
+        const turnTimer = setTimeout(() => {
+            if (userResponded) return;
+            
+            if (actualMatch) {
+                onResponse(false, 0);
+                setScore(s => Math.max(0, s - penalty));
+                setCurrentStreak(0);
+                setIncorrectPresses(p => p + 1);
+                setLastResult('incorrect');
+                setShowReviewHistory(true);
+
+                 setTimeout(() => {
+                    setShowReviewHistory(false);
+                    advanceTurn();
+                }, 1000);
+            } else {
+                 setLastResult('neutral');
+                 // A correct "no-op" should reset the streak.
+                 setCurrentStreak(0);
+                 advanceTurn();
             }
 
-            onResponse(false);
-            setScore(s => Math.max(0, s - 1));
-            setLastResult('incorrect');
-            setShowReviewHistory(true);
+        }, settings.speed);
 
-            setTimeout(() => {
-                setShowReviewHistory(false);
-                advanceTurn();
-            }, settings.speed);
-        };
+        return () => clearTimeout(turnTimer);
 
-        const timerId = window.setTimeout(handleNoResponse, settings.speed);
-        return () => clearTimeout(timerId);
-
-    }, [turn, isPaused, isGameOver, userResponded, stimuli.length, settings.speed, onResponse, advanceTurn, settings.nLevel]);
+    }, [turn, isPaused, isGameOver, userResponded, stimuli.length, settings.speed, onResponse, advanceTurn, settings.nLevel, gameSequence, penalty]);
 
     const handleMatch = (userPressedMatch: boolean) => {
         if (userResponded || turn < settings.nLevel || isPaused) return;
@@ -87,15 +106,20 @@ export const useGameLogic = ({ settings, stimuli, onResponse, isPaused }: UseGam
         const actualMatch = gameSequence[turn]?.id === gameSequence[turn - settings.nLevel]?.id;
         const isCorrect = userPressedMatch === actualMatch;
 
-        setLastResult(isCorrect ? 'correct' : 'incorrect');
-
         if (isCorrect) {
-            setScore(s => s + 2);
-            onResponse(true);
+            const newStreak = currentStreak + 1;
+            const comboBonus = (newStreak - 1) * (5 * settings.nLevel);
+            setScore(s => s + basePoints + comboBonus);
+            setCurrentStreak(newStreak);
+            onResponse(true, newStreak);
+            setLastResult('correct');
             setTimeout(advanceTurn, 500);
         } else {
-            setScore(s => Math.max(0, s - 1));
-            onResponse(false);
+            setScore(s => Math.max(0, s - penalty));
+            setCurrentStreak(0);
+            setIncorrectPresses(p => p + 1);
+            onResponse(false, 0);
+            setLastResult('incorrect');
             setShowReviewHistory(true);
             setTimeout(() => {
                 setShowReviewHistory(false);
@@ -107,35 +131,24 @@ export const useGameLogic = ({ settings, stimuli, onResponse, isPaused }: UseGam
     useEffect(() => {
         setScoreHistory(prev => {
             const newHistory = [...prev];
-            const existingEntryIndex = newHistory.findIndex(entry => entry.turn === turn);
-            
-            if(turn === 0 && score === 0) {
-                return [{ turn: 0, score: 0, result: 'neutral' }];
+            const lastTurnInHistory = newHistory[newHistory.length - 1];
+            if (!lastTurnInHistory || lastTurnInHistory.turn !== turn) {
+                newHistory.push({ turn, score, result: lastResult });
             }
-
-            if (existingEntryIndex !== -1) {
-                // Entry for this turn already exists, update it
-                if (newHistory[existingEntryIndex].score !== score || newHistory[existingEntryIndex].result !== lastResult) {
-                    newHistory[existingEntryIndex] = { turn, score, result: lastResult };
-                }
-            } else {
-                 // It's a new turn, add a new entry. `turn` is 0-indexed. The chart wants 1-based. Let's use `turn` as the key and adjust in the chart.
-                 // The history should reflect the state *after* a turn is complete.
-                 const lastTurnInHistory = prev[prev.length - 1];
-                 if(lastTurnInHistory.turn < turn) {
-                    newHistory.push({ turn, score, result: lastResult });
-                 }
-            }
-             // Ensure turn 0 is always there.
-             if(newHistory.length > 0 && newHistory[0].turn !== 0) {
-                newHistory.unshift({ turn: 0, score: 0, result: 'neutral' });
-             }
-
             return newHistory;
         });
     }, [score, turn, lastResult]);
 
+
     const progress = ((turn + 1) / settings.gameLength) * 100;
+
+    const gameStats: GameStats = {
+        score,
+        settings,
+        maxStreak,
+        incorrectPresses,
+        gameCompleted: isGameOver
+    };
 
     return {
         currentStimulus,
@@ -147,5 +160,7 @@ export const useGameLogic = ({ settings, stimuli, onResponse, isPaused }: UseGam
         history,
         showReviewHistory,
         scoreHistory,
+        gameStats,
+        currentStreak,
     };
 };

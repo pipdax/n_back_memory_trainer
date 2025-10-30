@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { GameSettings, Stimulus, StimulusType } from '../types';
+import { GameSettings, Stimulus, StimulusType, GameStats } from '../types';
 import { useGameLogic } from '../hooks/useGameLogic';
 import { CheckIcon, XIcon, PauseIcon, HomeIcon, PlayIcon } from './icons';
 import { playSound } from '../services/soundService';
@@ -8,7 +8,7 @@ import { playSound } from '../services/soundService';
 interface GameScreenProps {
   settings: GameSettings;
   resources: Stimulus[];
-  onEndGame: (score: number, history: Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>) => void;
+  onEndGame: (stats: GameStats, history: Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>) => void;
   onExit: () => void;
 }
 
@@ -71,6 +71,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
   const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
   const [gameState, setGameState] = useState<'ready' | 'playing' | 'over' | 'paused'>('ready');
   const [countdown, setCountdown] = useState(3);
+  const [comboDisplay, setComboDisplay] = useState(0);
+  const [showComboEffect, setShowComboEffect] = useState(false);
 
   const availableStimuli = useMemo(() => {
     if (settings.stimulusType === StimulusType.RANDOM) {
@@ -79,8 +81,19 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
     return resources.filter(r => r.type === settings.stimulusType);
   }, [settings.stimulusType, resources]);
 
-  const onResponse = useCallback((correct: boolean) => {
-    playSound(correct ? 'correct' : 'incorrect');
+  const onResponse = useCallback((correct: boolean, comboCount: number) => {
+    if (correct) {
+      if (comboCount > 1) {
+        playSound('combo', comboCount);
+        setComboDisplay(comboCount);
+        setShowComboEffect(true);
+        setTimeout(() => setShowComboEffect(false), 1000);
+      } else {
+        playSound('correct');
+      }
+    } else {
+      playSound('incorrect');
+    }
     setFeedback(correct ? 'correct' : 'incorrect');
     setTimeout(() => setFeedback(null), 500);
   }, []);
@@ -95,13 +108,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
     history,
     showReviewHistory,
     scoreHistory,
+    gameStats,
+    currentStreak,
   } = useGameLogic({ settings, stimuli: availableStimuli, onResponse, isPaused: gameState !== 'playing' });
 
   const reviewStimuli = history.slice(-settings.nLevel);
   
   const calculateReviewItemSize = (nLevel: number) => {
-    const maxWidth = 400; // a reasonable max width for the container in px
-    const gap = 16; // gap-4
+    const maxWidth = 400;
+    const gap = 16;
     const maxSize = 120; 
     const minSize = 64; 
 
@@ -118,9 +133,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
       const timer = setInterval(() => {
         setCountdown(c => {
           if (c > 1) {
+            playSound('click');
             return c - 1;
           } else {
             clearInterval(timer);
+            playSound('correct');
             setGameState('playing');
             return 0;
           }
@@ -133,9 +150,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
   useEffect(() => {
     if (isGameOver) {
       setGameState('over');
-      setTimeout(() => onEndGame(score, scoreHistory), 2000);
+      setTimeout(() => onEndGame(gameStats, scoreHistory), 2000);
     }
-  }, [isGameOver, onEndGame, score, scoreHistory]);
+  }, [isGameOver, onEndGame, gameStats, scoreHistory]);
 
   const handlePause = () => {
     playSound('click');
@@ -154,13 +171,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
 
   const handleUserMatch = (match: boolean) => {
     if (gameState !== 'playing') return;
-    playSound('click');
     handleMatch(match);
   }
 
   const getEndGameMessage = () => {
-    if (score >= settings.gameLength) return "太棒了，你是记忆大师！";
-    if (score > settings.gameLength / 2) return "很棒的成绩！";
+    const completionRatio = score / ((settings.gameLength - settings.nLevel) * 10 * Math.pow(2, settings.nLevel - 1));
+    if (completionRatio >= 0.8) return "太棒了，你是记忆大师！";
+    if (completionRatio >= 0.5) return "很棒的成绩！";
     return "继续努力，下次会更好！";
   }
 
@@ -184,7 +201,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
     return (
         <div className="flex flex-col items-center justify-center h-full animate-fade-in">
             <h2 className="font-display text-4xl text-blue-600 mb-4">准备好了吗？</h2>
-            <p className="text-8xl font-bold text-purple-600">{countdown}</p>
+            <p className="text-8xl font-bold text-purple-600 animate-bounce-in">{countdown}</p>
             {getTutorialText(settings.nLevel)}
         </div>
     );
@@ -208,13 +225,16 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
             </div>
         )}
 
-      <div className="w-full flex justify-between items-center text-lg sm:text-xl font-semibold z-10">
-         <button onClick={handlePause} className="p-3 rounded-full hover:bg-gray-200 transition active:scale-90" title="暂停">
+      <div className="w-full grid grid-cols-5 gap-2 items-center text-center text-base sm:text-lg font-semibold z-10">
+         <button onClick={handlePause} className="p-2 rounded-full hover:bg-gray-200 transition active:scale-90 flex justify-center" title="暂停">
             <PauseIcon className="w-8 h-8 text-gray-500 hover:text-gray-700" />
         </button>
         <div className="text-purple-700">N-Back: <span className="font-bold">{settings.nLevel}</span></div>
         <div className="text-blue-700">分数: <span className="font-bold">{score}</span></div>
-        <div className="text-gray-600">回合: <span className="font-bold">{turn} / {settings.gameLength}</span></div>
+        <div className={`text-orange-500 transition-opacity duration-300 ${currentStreak > 1 ? 'opacity-100' : 'opacity-0'}`}>
+            连击: <span className="font-bold">x{currentStreak}</span>🔥
+        </div>
+        <div className="text-gray-600">回合: <span className="font-bold">{turn}/{settings.gameLength}</span></div>
       </div>
       
       <div className="w-full bg-gray-200 rounded-full h-2.5 my-4">
@@ -241,6 +261,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
                            </div>
                         ))}
                     </div>
+                </div>
+            </div>
+        )}
+        
+        {showComboEffect && (
+            <div className="absolute top-[-4rem] left-0 right-0 flex justify-center pointer-events-none z-20">
+                <div className="text-6xl font-display text-orange-500 animate-bounce-in" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5), 0 0 10px #ff8c00' }}>
+                    x{comboDisplay} 连击! 🔥
                 </div>
             </div>
         )}

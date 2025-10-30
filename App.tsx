@@ -1,10 +1,13 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { GameSettings, Stimulus, Screen, StimulusType } from './types';
+import { GameSettings, Stimulus, Screen, StimulusType, UnlockedAchievements, GameStats } from './types';
 import { INITIAL_RESOURCES, DEFAULT_SETTINGS } from './constants';
+import { ALL_ACHIEVEMENTS } from './achievements';
+import { checkAchievements } from './services/achievementService';
 import StartScreen from './components/StartScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GameScreen from './components/GameScreen';
 import ResourceBrowser from './components/ResourceBrowser';
+import AchievementsScreen from './components/AchievementsScreen';
 import { DownloadIcon, UploadIcon } from './components/icons';
 import { playSound, setSoundEnabled } from './services/soundService';
 
@@ -12,10 +15,14 @@ const App: React.FC = () => {
   const [screen, setScreen] = useState<Screen>(Screen.START);
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [resources, setResources] = useState<Stimulus[]>(INITIAL_RESOURCES);
-  const [completedLevels, setCompletedLevels] = useState<Record<string, number>>({});
   const [lastGameHistory, setLastGameHistory] = useState<Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSoundOn, setIsSoundOn] = useState(true);
+
+  // Achievement State
+  const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievements>({});
+  const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([]);
+
 
   useEffect(() => {
     setSoundEnabled(isSoundOn);
@@ -27,7 +34,7 @@ const App: React.FC = () => {
       const dataToExport = JSON.stringify({
         settings,
         resources,
-        completedLevels,
+        unlockedAchievements,
       }, null, 2);
       const blob = new Blob([dataToExport], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -42,7 +49,7 @@ const App: React.FC = () => {
       console.error('Failed to export data:', error);
       alert('导出数据失败。请查看控制台了解详情。');
     }
-  }, [settings, resources, completedLevels]);
+  }, [settings, resources, unlockedAchievements]);
 
   const handleImportClick = () => {
     playSound('click');
@@ -60,11 +67,10 @@ const App: React.FC = () => {
         if (typeof text !== 'string') throw new Error('Invalid file content');
         const data = JSON.parse(text);
         
-        // Basic validation
         if (data.settings && data.resources) {
           setSettings(data.settings);
           setResources(data.resources);
-          if(data.completedLevels) setCompletedLevels(data.completedLevels);
+          if(data.unlockedAchievements) setUnlockedAchievements(data.unlockedAchievements);
           alert('游戏数据导入成功！');
           setScreen(Screen.START);
         } else {
@@ -76,16 +82,39 @@ const App: React.FC = () => {
       }
     };
     reader.readAsText(file);
-    // Reset file input value to allow importing the same file again
     if(fileInputRef.current) {
         fileInputRef.current.value = '';
     }
   };
 
-  const handleLevelComplete = (level: number, score: number) => {
-    const key = `${settings.stimulusType}-${settings.nLevel}`;
-    setCompletedLevels(prev => ({ ...prev, [key]: Math.max(prev[key] || 0, score) }));
+ const handleGameEnd = (stats: GameStats, history: Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>) => {
+    setLastGameHistory(history);
+    
+    const justUnlocked = checkAchievements(stats, unlockedAchievements);
+    
+    if (justUnlocked.length > 0) {
+      const now = new Date().toISOString();
+      const newAchievementsRecord = { ...unlockedAchievements };
+      justUnlocked.forEach(id => {
+        newAchievementsRecord[id] = now;
+      });
+      setUnlockedAchievements(newAchievementsRecord);
+      setNewlyUnlocked(justUnlocked);
+      playSound('achievement');
+    }
+
+    setScreen(Screen.START);
   };
+  
+  const handleAIFetch = () => {
+    if (!unlockedAchievements['ai_explorer']) {
+        const now = new Date().toISOString();
+        setUnlockedAchievements(prev => ({ ...prev, 'ai_explorer': now }));
+        setNewlyUnlocked(['ai_explorer']);
+        playSound('achievement');
+    }
+  };
+
 
   const handleStartGame = () => {
     setLastGameHistory([]);
@@ -100,15 +129,13 @@ const App: React.FC = () => {
         return <GameScreen 
           settings={settings} 
           resources={resources} 
-          onEndGame={(score, history) => {
-            handleLevelComplete(settings.level, score);
-            setLastGameHistory(history);
-            setScreen(Screen.START);
-          }}
+          onEndGame={handleGameEnd}
           onExit={() => setScreen(Screen.START)} 
         />;
       case Screen.RESOURCES:
-        return <ResourceBrowser resources={resources} setResources={setResources} onBack={() => setScreen(Screen.START)} />;
+        return <ResourceBrowser resources={resources} setResources={setResources} onBack={() => setScreen(Screen.START)} onAIFetch={handleAIFetch}/>;
+      case Screen.ACHIEVEMENTS:
+        return <AchievementsScreen unlockedAchievements={unlockedAchievements} onBack={() => setScreen(Screen.START)} />;
       case Screen.START:
       default:
         return <StartScreen 
@@ -118,6 +145,10 @@ const App: React.FC = () => {
                   lastGameHistory={lastGameHistory}
                   isSoundOn={isSoundOn}
                   setIsSoundOn={setIsSoundOn}
+                  unlockedAchievementsCount={Object.keys(unlockedAchievements).length}
+                  totalAchievementsCount={ALL_ACHIEVEMENTS.length}
+                  newlyUnlocked={newlyUnlocked}
+                  onDismissNotifications={() => setNewlyUnlocked([])}
                 />;
     }
   };
