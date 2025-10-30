@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { GameSettings, Stimulus, Screen, StimulusType, UnlockedAchievements, GameStats } from './types';
+import { GameSettings, Stimulus, Screen, StimulusType, UnlockedAchievements, GameStats, PlayerRewards } from './types';
 import { INITIAL_RESOURCES, DEFAULT_SETTINGS } from './constants';
 import { ALL_ACHIEVEMENTS } from './achievements';
 import { checkAchievements } from './services/achievementService';
+import { calculateStars } from './services/rewardService';
 import StartScreen from './components/StartScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GameScreen from './components/GameScreen';
@@ -18,6 +19,9 @@ const App: React.FC = () => {
   const [lastGameHistory, setLastGameHistory] = useState<Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSoundOn, setIsSoundOn] = useState(true);
+
+  // Rewards State
+  const [playerRewards, setPlayerRewards] = useState<PlayerRewards>({ stars: 0, gems: 0, trophies: 0, perfectScores: 0 });
 
   // Achievement State
   const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievements>({});
@@ -35,6 +39,7 @@ const App: React.FC = () => {
         settings,
         resources,
         unlockedAchievements,
+        playerRewards,
       }, null, 2);
       const blob = new Blob([dataToExport], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -49,7 +54,7 @@ const App: React.FC = () => {
       console.error('Failed to export data:', error);
       alert('导出数据失败。请查看控制台了解详情。');
     }
-  }, [settings, resources, unlockedAchievements]);
+  }, [settings, resources, unlockedAchievements, playerRewards]);
 
   const handleImportClick = () => {
     playSound('click');
@@ -71,6 +76,7 @@ const App: React.FC = () => {
           setSettings(data.settings);
           setResources(data.resources);
           if(data.unlockedAchievements) setUnlockedAchievements(data.unlockedAchievements);
+          if(data.playerRewards) setPlayerRewards(data.playerRewards);
           alert('游戏数据导入成功！');
           setScreen(Screen.START);
         } else {
@@ -87,11 +93,11 @@ const App: React.FC = () => {
     }
   };
 
- const handleGameEnd = (stats: GameStats, history: Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>) => {
+  const handleGameEnd = (stats: GameStats, history: Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>) => {
     setLastGameHistory(history);
-    
+
+    // Handle achievements
     const justUnlocked = checkAchievements(stats, unlockedAchievements);
-    
     if (justUnlocked.length > 0) {
       const now = new Date().toISOString();
       const newAchievementsRecord = { ...unlockedAchievements };
@@ -101,6 +107,32 @@ const App: React.FC = () => {
       setUnlockedAchievements(newAchievementsRecord);
       setNewlyUnlocked(justUnlocked);
       playSound('achievement');
+    }
+
+    // Handle rewards
+    const starsEarned = calculateStars(stats);
+    if (starsEarned > 0) {
+        setPlayerRewards(prevRewards => {
+            let newStars = prevRewards.stars + starsEarned;
+            let newGems = prevRewards.gems;
+            let newTrophies = prevRewards.trophies;
+            let newPerfectScores = prevRewards.perfectScores;
+
+            if (newStars >= 10) {
+                newGems += Math.floor(newStars / 10);
+                newStars %= 10;
+            }
+            if (newGems >= 10) {
+                newTrophies += Math.floor(newGems / 10);
+                newGems %= 10;
+            }
+            if (newTrophies >= 10) {
+                newPerfectScores += Math.floor(newTrophies / 10);
+                newTrophies %= 10;
+            }
+
+            return { stars: newStars, gems: newGems, trophies: newTrophies, perfectScores: newPerfectScores };
+        });
     }
 
     setScreen(Screen.START);
@@ -149,6 +181,7 @@ const App: React.FC = () => {
                   totalAchievementsCount={ALL_ACHIEVEMENTS.length}
                   newlyUnlocked={newlyUnlocked}
                   onDismissNotifications={() => setNewlyUnlocked([])}
+                  playerRewards={playerRewards}
                 />;
     }
   };

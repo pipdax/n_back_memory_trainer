@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GameSettings, Screen, StimulusType } from '../types';
+import { GameSettings, Screen, StimulusType, PlayerRewards } from '../types';
 import { ALL_ACHIEVEMENTS } from '../achievements';
 import { PlayIcon, CogIcon, CollectionIcon, VolumeUpIcon, VolumeOffIcon, CheckIcon, XIcon, TrophyIcon } from './icons';
 import { playSound, setSoundEnabled } from '../services/soundService';
@@ -17,6 +17,7 @@ interface StartScreenProps {
   totalAchievementsCount: number;
   newlyUnlocked: string[];
   onDismissNotifications: () => void;
+  playerRewards: PlayerRewards;
 }
 
 const stimulusTypeToChinese = (type: StimulusType) => {
@@ -85,9 +86,36 @@ const AchievementToast: React.FC<{ achievementId: string, onDismiss: () => void 
     );
 };
 
+const RewardPodium: React.FC<{ rewards: PlayerRewards }> = ({ rewards }) => {
+    const tiers = [
+        { icon: '✨', count: rewards.stars, name: '星星', color: 'from-purple-400 to-purple-600', height: 'h-20' },
+        { icon: '💎', count: rewards.gems, name: '宝石', color: 'from-blue-400 to-blue-600', height: 'h-24' },
+        { icon: '🏆', count: rewards.trophies, name: '奖杯', color: 'from-amber-400 to-amber-600', height: 'h-28' },
+        { icon: '💯', count: rewards.perfectScores, name: '完美', color: 'from-red-400 to-red-600', height: 'h-32' },
+    ];
+
+    return (
+        <div className="w-full max-w-lg p-4 bg-white/80 rounded-xl shadow-lg animate-fade-in">
+            <h3 className="font-display text-2xl text-gray-700 mb-4 text-center">我的奖励</h3>
+            <div className="flex justify-around items-end text-center text-white space-x-2">
+                {tiers.map((tier, index) => (
+                    <div key={tier.name} className="flex-1 flex flex-col items-center justify-end">
+                        <div className={`w-full ${tier.height} bg-gradient-to-b ${tier.color} rounded-t-lg flex flex-col items-center justify-center p-1 shadow-md`}>
+                            <span className="text-3xl md:text-4xl drop-shadow-lg">{tier.icon}</span>
+                            <span className="text-xl md:text-2xl font-bold drop-shadow-md">{tier.count}</span>
+                            <span className="text-xs font-semibold hidden sm:block">{tier.name}</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const StartScreen: React.FC<StartScreenProps> = ({ 
   setScreen, settings, onStartGame, lastGameHistory, isSoundOn, setIsSoundOn, 
-  unlockedAchievementsCount, totalAchievementsCount, newlyUnlocked, onDismissNotifications
+  unlockedAchievementsCount, totalAchievementsCount, newlyUnlocked, onDismissNotifications,
+  playerRewards
 }) => {
 
   const handleNavigation = (screen: Screen) => {
@@ -127,7 +155,9 @@ const StartScreen: React.FC<StartScreenProps> = ({
       <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-md">
         准备好提升你的脑力了吗？选择一个选项开始吧。
       </p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-lg">
+
+      {/* Action Buttons */}
+      <div className="grid grid-cols-2 gap-4 w-full max-w-lg mb-8">
         <button
           onClick={handleStartGameClick}
           className="group col-span-2 flex flex-col items-center justify-center p-6 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition-all transform hover:-translate-y-1 active:scale-95"
@@ -152,9 +182,18 @@ const StartScreen: React.FC<StartScreenProps> = ({
           <span className="font-bold text-xl">资源库</span>
            <span className="text-sm opacity-80">查看/添加</span>
         </button>
+      </div>
+      
+      {/* Reward Podium */}
+      <div className="w-full max-w-lg mb-8">
+        <RewardPodium rewards={playerRewards} />
+      </div>
+      
+      {/* Achievements Button */}
+      <div className="w-full max-w-lg">
         <button
           onClick={() => handleNavigation(Screen.ACHIEVEMENTS)}
-          className="group col-span-2 md:col-span-4 flex flex-col items-center justify-center p-6 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all transform hover:-translate-y-1 active:scale-95"
+          className="group w-full flex flex-col items-center justify-center p-6 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all transform hover:-translate-y-1 active:scale-95"
         >
           <TrophyIcon className="w-12 h-12 mb-2" />
           <span className="font-bold text-xl">成就</span>

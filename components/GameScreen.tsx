@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { GameSettings, Stimulus, StimulusType, GameStats } from '../types';
 import { useGameLogic } from '../hooks/useGameLogic';
+import { calculateStars } from '../services/rewardService';
 import { CheckIcon, XIcon, PauseIcon, HomeIcon, PlayIcon } from './icons';
 import { playSound } from '../services/soundService';
 
@@ -73,6 +74,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
   const [countdown, setCountdown] = useState(3);
   const [comboDisplay, setComboDisplay] = useState(0);
   const [showComboEffect, setShowComboEffect] = useState(false);
+  const [starsEarned, setStarsEarned] = useState(0);
 
   const availableStimuli = useMemo(() => {
     if (settings.stimulusType === StimulusType.RANDOM) {
@@ -150,7 +152,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
   useEffect(() => {
     if (isGameOver) {
       setGameState('over');
-      setTimeout(() => onEndGame(gameStats, scoreHistory), 2000);
+      const earned = calculateStars(gameStats);
+      setStarsEarned(earned);
+      // Give user time to see their stars
+      setTimeout(() => onEndGame(gameStats, scoreHistory), 3000);
     }
   }, [isGameOver, onEndGame, gameStats, scoreHistory]);
 
@@ -175,9 +180,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
   }
 
   const getEndGameMessage = () => {
-    const completionRatio = score / ((settings.gameLength - settings.nLevel) * 10 * Math.pow(2, settings.nLevel - 1));
-    if (completionRatio >= 0.8) return "太棒了，你是记忆大师！";
-    if (completionRatio >= 0.5) return "很棒的成绩！";
+    if (starsEarned === 3) return "太棒了，你是记忆大师！";
+    if (starsEarned >= 1) return "很棒的成绩！";
     return "继续努力，下次会更好！";
   }
 
@@ -280,6 +284,11 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
             <div className="absolute inset-0 flex flex-col items-center justify-center animate-bounce-in text-center">
               <h2 className="font-display text-4xl sm:text-5xl text-green-600">{getEndGameMessage()}</h2>
               <p className="text-2xl mt-2">最终得分: {score}</p>
+               <div className="flex mt-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <span key={i} className={`text-5xl transition-all duration-300 transform ${i < starsEarned ? 'text-yellow-400 scale-110' : 'text-gray-300'}`} style={{transitionDelay: `${i * 150}ms`}}>✨</span>
+                ))}
+              </div>
             </div>
           )}
 

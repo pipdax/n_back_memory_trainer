@@ -52,3 +52,10 @@ export interface GameStats {
     incorrectPresses: number;
     gameCompleted: boolean;
 }
+
+export interface PlayerRewards {
+  stars: number;
+  gems: number;
+  trophies: number;
+  perfectScores: number;
+}
