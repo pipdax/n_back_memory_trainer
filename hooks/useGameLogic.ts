@@ -73,6 +73,7 @@ export const useGameLogic = ({ settings, stimuli, onResponse, isPaused }: UseGam
         const turnTimer = setTimeout(() => {
             if (userResponded) return;
             
+            // Timer runs out - this is an incorrect action only if there WAS a match
             if (actualMatch) {
                 onResponse(false, 0);
                 setScore(s => Math.max(0, s - penalty));
@@ -86,9 +87,9 @@ export const useGameLogic = ({ settings, stimuli, onResponse, isPaused }: UseGam
                     advanceTurn();
                 }, 1000);
             } else {
+                 // Correct "no-op": No match, and user correctly did nothing.
+                 // This no longer breaks the combo streak.
                  setLastResult('neutral');
-                 // A correct "no-op" should reset the streak.
-                 setCurrentStreak(0);
                  advanceTurn();
             }
 

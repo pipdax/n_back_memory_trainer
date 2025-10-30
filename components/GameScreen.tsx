@@ -240,6 +240,14 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
       <div className="w-full bg-gray-200 rounded-full h-2.5 my-4">
         <div className="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
       </div>
+      
+      {showComboEffect && (
+          <div className="absolute top-40 left-0 right-0 flex justify-center pointer-events-none z-20">
+              <div className="text-6xl font-display text-orange-500 animate-bounce-in" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5), 0 0 10px #ff8c00' }}>
+                  x{comboDisplay} 连击! 🔥
+              </div>
+          </div>
+      )}
 
       <div className="relative my-auto flex items-center justify-center h-64 w-full">
         <div className={`transition-transform duration-500 ${gameState === 'over' ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}>
@@ -265,14 +273,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
             </div>
         )}
         
-        {showComboEffect && (
-            <div className="absolute top-[-4rem] left-0 right-0 flex justify-center pointer-events-none z-20">
-                <div className="text-6xl font-display text-orange-500 animate-bounce-in" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5), 0 0 10px #ff8c00' }}>
-                    x{comboDisplay} 连击! 🔥
-                </div>
-            </div>
-        )}
-
         {gameState === 'over' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center animate-bounce-in text-center">
             <h2 className="font-display text-4xl sm:text-5xl text-green-600">{getEndGameMessage()}</h2>
