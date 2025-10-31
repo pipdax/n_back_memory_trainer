@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { GameSettings, Stimulus, Screen, StimulusType, UnlockedAchievements, GameStats, PlayerRewards } from './types';
-import { INITIAL_RESOURCES, DEFAULT_SETTINGS } from './constants';
+import { GameSettings, Stimulus, Screen, PlayerRewards, UnlockedAchievements, GameStats } from './types';
+import { DEFAULT_SETTINGS, INITIAL_RESOURCES } from './constants';
 import { ALL_ACHIEVEMENTS } from './achievements';
 import { checkAchievements } from './services/achievementService';
 import { calculateStars } from './services/rewardService';
+import { loadState, saveState } from './services/storageService';
 import StartScreen from './components/StartScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GameScreen from './components/GameScreen';
@@ -14,19 +15,30 @@ import { playSound, setSoundEnabled } from './services/soundService';
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<Screen>(Screen.START);
-  const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
-  const [resources, setResources] = useState<Stimulus[]>(INITIAL_RESOURCES);
+  
+  // Load initial state from localStorage or use defaults
+  const [settings, setSettings] = useState<GameSettings>(() => loadState()?.settings || DEFAULT_SETTINGS);
+  const [resources, setResources] = useState<Stimulus[]>(() => loadState()?.resources || INITIAL_RESOURCES);
+  const [playerRewards, setPlayerRewards] = useState<PlayerRewards>(() => loadState()?.playerRewards || { stars: 0, gems: 0, trophies: 0, perfectScores: 0 });
+  const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievements>(() => loadState()?.unlockedAchievements || {});
+  const [isSoundOn, setIsSoundOn] = useState<boolean>(() => loadState()?.isSoundOn ?? true);
+  
   const [lastGameHistory, setLastGameHistory] = useState<Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isSoundOn, setIsSoundOn] = useState(true);
-
-  // Rewards State
-  const [playerRewards, setPlayerRewards] = useState<PlayerRewards>({ stars: 0, gems: 0, trophies: 0, perfectScores: 0 });
 
   // Achievement State
-  const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievements>({});
   const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([]);
 
+  // Effect to save state to localStorage whenever it changes
+  useEffect(() => {
+    saveState({
+      settings,
+      resources,
+      playerRewards,
+      unlockedAchievements,
+      isSoundOn,
+    });
+  }, [settings, resources, playerRewards, unlockedAchievements, isSoundOn]);
 
   useEffect(() => {
     setSoundEnabled(isSoundOn);
@@ -40,6 +52,7 @@ const App: React.FC = () => {
         resources,
         unlockedAchievements,
         playerRewards,
+        isSoundOn,
       }, null, 2);
       const blob = new Blob([dataToExport], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -54,7 +67,7 @@ const App: React.FC = () => {
       console.error('Failed to export data:', error);
       alert('导出数据失败。请查看控制台了解详情。');
     }
-  }, [settings, resources, unlockedAchievements, playerRewards]);
+  }, [settings, resources, unlockedAchievements, playerRewards, isSoundOn]);
 
   const handleImportClick = () => {
     playSound('click');
@@ -72,11 +85,13 @@ const App: React.FC = () => {
         if (typeof text !== 'string') throw new Error('Invalid file content');
         const data = JSON.parse(text);
         
+        // Validate imported data structure before setting state
         if (data.settings && data.resources) {
           setSettings(data.settings);
           setResources(data.resources);
           if(data.unlockedAchievements) setUnlockedAchievements(data.unlockedAchievements);
           if(data.playerRewards) setPlayerRewards(data.playerRewards);
+          if(typeof data.isSoundOn === 'boolean') setIsSoundOn(data.isSoundOn);
           alert('游戏数据导入成功！');
           setScreen(Screen.START);
         } else {
@@ -130,6 +145,9 @@ const App: React.FC = () => {
                 newPerfectScores += Math.floor(newTrophies / 10);
                 newTrophies %= 10;
             }
+             if (stats.incorrectPresses === 0 && stats.score > 0) {
+                newPerfectScores += 1;
+            }
 
             return { stars: newStars, gems: newGems, trophies: newTrophies, perfectScores: newPerfectScores };
         });
@@ -147,6 +165,11 @@ const App: React.FC = () => {
     }
   };
 
+  const handleClearAllProgress = () => {
+    setPlayerRewards({ stars: 0, gems: 0, trophies: 0, perfectScores: 0 });
+    setUnlockedAchievements({});
+  };
+
 
   const handleStartGame = () => {
     setLastGameHistory([]);
@@ -156,7 +179,12 @@ const App: React.FC = () => {
   const renderScreen = () => {
     switch (screen) {
       case Screen.SETTINGS:
-        return <SettingsScreen settings={settings} setSettings={setSettings} onBack={() => setScreen(Screen.START)} />;
+        return <SettingsScreen 
+                  settings={settings} 
+                  setSettings={setSettings} 
+                  onBack={() => setScreen(Screen.START)} 
+                  onClearAllProgress={handleClearAllProgress}
+                />;
       case Screen.GAME:
         return <GameScreen 
           settings={settings} 

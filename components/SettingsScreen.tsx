@@ -8,6 +8,7 @@ interface SettingsScreenProps {
   settings: GameSettings;
   setSettings: React.Dispatch<React.SetStateAction<GameSettings>>;
   onBack: () => void;
+  onClearAllProgress: () => void;
 }
 
 const stimulusTypeMap: { [key in StimulusType]?: string } = {
@@ -20,7 +21,7 @@ const stimulusTypeMap: { [key in StimulusType]?: string } = {
     [StimulusType.RANDOM]: '随机',
 };
 
-const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, setSettings, onBack }) => {
+const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, setSettings, onBack, onClearAllProgress }) => {
   const handleNLevelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSettings(s => ({ ...s, nLevel: parseInt(e.target.value, 10) }));
   };
@@ -31,6 +32,22 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, setSettings, 
   
     const handleSpeedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSettings(s => ({ ...s, speed: parseInt(e.target.value, 10) }));
+  };
+
+  const handleGameLengthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSettings(s => ({ ...s, gameLength: parseInt(e.target.value, 10) }));
+  };
+
+  const handleClearProgressClick = () => {
+    playSound('click');
+    const isConfirmed = window.confirm(
+        "警告：您确定要清除所有的奖励（星星、宝石、奖杯、完美得分）和已解锁的成就吗？\n\n此操作无法撤销！"
+    );
+    if (isConfirmed) {
+        playSound('incorrect');
+        onClearAllProgress();
+        alert("所有奖励和成就数据已被清除。");
+    }
   };
 
   const handleBack = () => {
@@ -77,6 +94,21 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, setSettings, 
           </select>
         </div>
         <div>
+          <label htmlFor="game-length" className="block text-lg font-semibold text-gray-700 mb-2">
+            游戏回合数: <span className="font-bold text-blue-600">{settings.gameLength}</span>
+          </label>
+          <input
+            id="game-length"
+            type="range"
+            min="10"
+            max="50"
+            step="5"
+            value={settings.gameLength}
+            onChange={handleGameLengthChange}
+            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer range-lg accent-blue-500"
+          />
+        </div>
+        <div>
           <label htmlFor="speed" className="block text-lg font-semibold text-gray-700 mb-2">
             速度 (毫秒/项目): <span className="font-bold text-blue-600">{settings.speed}ms</span>
           </label>
@@ -99,6 +131,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, setSettings, 
         >
           保存并返回
         </button>
+        <div className="mt-6 pt-6 border-t-2 border-dashed border-red-300">
+            <h3 className="text-lg font-semibold text-red-700 mb-2 text-center">危险区域</h3>
+            <button
+                onClick={handleClearProgressClick}
+                className="w-full py-2 bg-red-600 text-white font-bold rounded-lg shadow-lg hover:bg-red-700 transition active:scale-95"
+            >
+                一键清除所有奖励和成就
+            </button>
+        </div>
       </div>
     </div>
   );
