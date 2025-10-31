@@ -1,44 +1,46 @@
 import { GameStats, PlayerRewards } from '../types';
 
 /**
- * Calculates the number of stars (0-3) earned based on game performance.
- * The calculation is based on the score achieved relative to the maximum possible
- * base score for the given game settings (excluding combo bonuses).
+ * Calculates the number of stars earned based on game performance.
+ * The calculation is now directly tied to the score to better reward high performance,
+ * instead of a flat 0-3 star rating.
  * @param stats The statistics from the completed game.
- * @returns The number of stars earned (0, 1, 2, or 3).
+ * @returns The number of stars earned.
  */
 export const calculateStars = (stats: GameStats): number => {
     const { score, settings } = stats;
-    const { gameLength, nLevel } = settings;
+
+    // If the score is zero or negative, no stars are awarded.
+    if (score <= 0) {
+        return 0;
+    }
+
+    // The base points awarded for a single correct match, used to scale the star rewards.
+    const basePoints = 10 * Math.pow(2, settings.nLevel - 1);
     
-    // The base points awarded for a correct match.
-    const basePoints = 10 * Math.pow(2, nLevel - 1);
+    // Award 1 star for every 5 * basePoints scored.
+    // This makes rewards more granular and scales with difficulty.
+    const starConversionRate = 5 * basePoints;
     
-    // The maximum score a player can get without any combo bonuses.
-    // A perfect game without combos.
-    const perfectBaseScore = (gameLength - nLevel) * basePoints;
-
-    // A more realistic 'max' score including some combos. Assume an average combo of 2 for half the correct answers.
-    // This provides a better ceiling for star calculation.
-    const estimatedMaxScore = perfectBaseScore * 1.5;
-
-    // If for some reason max score is zero, no stars can be earned.
-    if (estimatedMaxScore <= 0) return 0;
-
-    const scorePercentage = (score / estimatedMaxScore);
-
-    if (scorePercentage >= 0.7) return 3; // 3 stars for >= 70% of estimated max score
-    if (scorePercentage >= 0.4) return 2; // 2 stars for >= 40%
-    if (scorePercentage >= 0.15) return 1; // 1 star for >= 15%
+    // Ensure the conversion rate is at least 1 to avoid division by zero, though unlikely.
+    if (starConversionRate <= 0) return 0;
     
-    return 0; // 0 stars otherwise
+    const starsEarned = Math.floor(score / starConversionRate);
+    
+    return starsEarned;
 };
 
 
 /**
  * Processes rewards after a game, calculating earned rewards and new totals.
- * Handles the cascading conversion of stars -> gems -> trophies.
- * A perfect game now awards 1 trophy directly instead of a perfect score.
+ * A perfect game awards an additional gem *after* star conversions are calculated.
+ *
+ * The logic follows these steps:
+ * 1. Convert any earned stars (including existing ones) into gems.
+ * 2. If the game was perfect, add one bonus gem.
+ * 3. Cascade all accumulated gems into trophies.
+ * 4. Cascade all accumulated trophies into perfect scores.
+ *
  * @param currentRewards The player's rewards before this game.
  * @param starsToAdd The number of stars earned in this game.
  * @param wasPerfectScore Whether the player achieved a perfect score.
@@ -50,57 +52,61 @@ export const processRewards = (
   wasPerfectScore: boolean
 ): { earned: PlayerRewards, newTotal: PlayerRewards } => {
   
-  let stars = currentRewards.stars + starsToAdd;
-  let gems = currentRewards.gems;
-  let trophies = currentRewards.trophies;
-  let perfectScores = currentRewards.perfectScores;
+  // Temporary variables to hold totals during calculation
+  let tempStars = currentRewards.stars + starsToAdd;
+  let tempGems = currentRewards.gems;
+  let tempTrophies = currentRewards.trophies;
+  let tempPerfectScores = currentRewards.perfectScores;
   
-  let earnedGems = 0;
-  let earnedTrophies = 0;
-  let earnedPerfectScores = 0;
+  // Track what's earned in this specific game session
+  let earnedGemsThisSession = 0;
+  let earnedTrophiesThisSession = 0;
+  let earnedPerfectScoresThisSession = 0;
 
-  // A perfect game now awards 1 Trophy instead of 1 Perfect Score.
-  const earnedTrophyFromPerformance = wasPerfectScore ? 1 : 0;
+  // --- Step 1: Handle rewards from star conversion ---
+  if (tempStars >= 10) {
+    const gemsFromStars = Math.floor(tempStars / 10);
+    earnedGemsThisSession += gemsFromStars;
+    tempGems += gemsFromStars;
+    tempStars %= 10;
+  }
+
+  // --- Step 2: Add bonus gem for a perfect game, AFTER star conversion ---
   if (wasPerfectScore) {
-      trophies += 1;
+      earnedGemsThisSession += 1;
+      tempGems += 1;
   }
-
-  // Cascade stars to gems
-  if (stars >= 10) {
-    const gemsFromStars = Math.floor(stars / 10);
-    earnedGems += gemsFromStars;
-    gems += gemsFromStars;
-    stars %= 10;
-  }
-
+  
+  // --- Step 3: Cascade all accumulated gems and trophies upwards ---
+  
   // Cascade gems to trophies
-  if (gems >= 10) {
-    const trophiesFromGems = Math.floor(gems / 10);
-    earnedTrophies += trophiesFromGems;
-    trophies += trophiesFromGems;
-    gems %= 10;
+  if (tempGems >= 10) {
+    const trophiesFromGems = Math.floor(tempGems / 10);
+    earnedTrophiesThisSession += trophiesFromGems;
+    tempTrophies += trophiesFromGems;
+    tempGems %= 10;
   }
   
   // Cascade trophies to perfect scores
-  if (trophies >= 10) {
-      const perfectFromTrophies = Math.floor(trophies / 10);
-      earnedPerfectScores += perfectFromTrophies;
-      perfectScores += perfectFromTrophies;
-      trophies %= 10;
+  if (tempTrophies >= 10) {
+      const perfectFromTrophies = Math.floor(tempTrophies / 10);
+      earnedPerfectScoresThisSession += perfectFromTrophies;
+      tempPerfectScores += perfectFromTrophies;
+      tempTrophies %= 10;
   }
   
   return {
     earned: { 
       stars: starsToAdd, 
-      gems: earnedGems, 
-      trophies: earnedTrophies + earnedTrophyFromPerformance, 
-      perfectScores: earnedPerfectScores 
+      gems: earnedGemsThisSession, 
+      trophies: earnedTrophiesThisSession, 
+      perfectScores: earnedPerfectScoresThisSession
     },
     newTotal: { 
-      stars, 
-      gems, 
-      trophies, 
-      perfectScores 
+      stars: tempStars, 
+      gems: tempGems, 
+      trophies: tempTrophies, 
+      perfectScores: tempPerfectScores 
     }
   };
 };
