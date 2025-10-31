@@ -3,7 +3,7 @@ import { GameSettings, Stimulus, Screen, PlayerRewards, UnlockedAchievements, Ga
 import { DEFAULT_SETTINGS, INITIAL_RESOURCES } from './constants';
 import { ALL_ACHIEVEMENTS } from './achievements';
 import { checkAchievements } from './services/achievementService';
-import { calculateStars } from './services/rewardService';
+import { calculateStars, processRewards } from './services/rewardService';
 import { loadState, saveState } from './services/storageService';
 import StartScreen from './components/StartScreen';
 import SettingsScreen from './components/SettingsScreen';
@@ -12,6 +12,8 @@ import ResourceBrowser from './components/ResourceBrowser';
 import AchievementsScreen from './components/AchievementsScreen';
 import { DownloadIcon, UploadIcon } from './components/icons';
 import { playSound, setSoundEnabled } from './services/soundService';
+import { usePrevious } from './hooks/usePrevious';
+
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<Screen>(Screen.START);
@@ -28,6 +30,11 @@ const App: React.FC = () => {
 
   // Achievement State
   const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([]);
+  
+  // Animation control state
+  const [justFinishedGame, setJustFinishedGame] = useState(false);
+  const previousPlayerRewards = usePrevious(playerRewards);
+
 
   // Effect to save state to localStorage whenever it changes
   useEffect(() => {
@@ -126,33 +133,16 @@ const App: React.FC = () => {
 
     // Handle rewards
     const starsEarned = calculateStars(stats);
-    if (starsEarned > 0) {
-        setPlayerRewards(prevRewards => {
-            let newStars = prevRewards.stars + starsEarned;
-            let newGems = prevRewards.gems;
-            let newTrophies = prevRewards.trophies;
-            let newPerfectScores = prevRewards.perfectScores;
-
-            if (newStars >= 10) {
-                newGems += Math.floor(newStars / 10);
-                newStars %= 10;
-            }
-            if (newGems >= 10) {
-                newTrophies += Math.floor(newGems / 10);
-                newGems %= 10;
-            }
-            if (newTrophies >= 10) {
-                newPerfectScores += Math.floor(newTrophies / 10);
-                newTrophies %= 10;
-            }
-             if (stats.incorrectPresses === 0 && stats.score > 0) {
-                newPerfectScores += 1;
-            }
-
-            return { stars: newStars, gems: newGems, trophies: newTrophies, perfectScores: newPerfectScores };
-        });
+    const wasPerfect = stats.incorrectPresses === 0 && stats.score > 0 && stats.gameCompleted;
+    
+    if (starsEarned > 0 || wasPerfect) {
+      setPlayerRewards(prevRewards => {
+        const { newTotal } = processRewards(prevRewards, starsEarned, wasPerfect);
+        return newTotal;
+      });
     }
 
+    setJustFinishedGame(true);
     setScreen(Screen.START);
   };
   
@@ -172,9 +162,15 @@ const App: React.FC = () => {
 
 
   const handleStartGame = () => {
+    setJustFinishedGame(false);
     setLastGameHistory([]);
     setScreen(Screen.GAME);
   };
+  
+  const handleNavigate = (screen: Screen) => {
+    setJustFinishedGame(false);
+    setScreen(screen);
+  }
 
   const renderScreen = () => {
     switch (screen) {
@@ -182,24 +178,25 @@ const App: React.FC = () => {
         return <SettingsScreen 
                   settings={settings} 
                   setSettings={setSettings} 
-                  onBack={() => setScreen(Screen.START)} 
+                  onBack={() => handleNavigate(Screen.START)} 
                   onClearAllProgress={handleClearAllProgress}
                 />;
       case Screen.GAME:
         return <GameScreen 
           settings={settings} 
           resources={resources} 
+          playerRewards={playerRewards}
           onEndGame={handleGameEnd}
-          onExit={() => setScreen(Screen.START)} 
+          onExit={() => handleNavigate(Screen.START)} 
         />;
       case Screen.RESOURCES:
-        return <ResourceBrowser resources={resources} setResources={setResources} onBack={() => setScreen(Screen.START)} onAIFetch={handleAIFetch}/>;
+        return <ResourceBrowser resources={resources} setResources={setResources} onBack={() => handleNavigate(Screen.START)} onAIFetch={handleAIFetch}/>;
       case Screen.ACHIEVEMENTS:
-        return <AchievementsScreen unlockedAchievements={unlockedAchievements} onBack={() => setScreen(Screen.START)} />;
+        return <AchievementsScreen unlockedAchievements={unlockedAchievements} onBack={() => handleNavigate(Screen.START)} />;
       case Screen.START:
       default:
         return <StartScreen 
-                  setScreen={setScreen} 
+                  onNavigate={handleNavigate}
                   settings={settings} 
                   onStartGame={handleStartGame}
                   lastGameHistory={lastGameHistory}
@@ -210,6 +207,9 @@ const App: React.FC = () => {
                   newlyUnlocked={newlyUnlocked}
                   onDismissNotifications={() => setNewlyUnlocked([])}
                   playerRewards={playerRewards}
+                  previousPlayerRewards={previousPlayerRewards}
+                  justFinishedGame={justFinishedGame}
+                  onAnimationComplete={() => setJustFinishedGame(false)}
                 />;
     }
   };

@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GameSettings, Screen, StimulusType, PlayerRewards } from '../types';
 import { ALL_ACHIEVEMENTS } from '../achievements';
 import { PlayIcon, CogIcon, CollectionIcon, VolumeUpIcon, VolumeOffIcon, CheckIcon, XIcon, TrophyIcon } from './icons';
 import { playSound, setSoundEnabled } from '../services/soundService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useAnimatedCounter } from '../hooks/useAnimatedCounter';
+import { RewardAnimation } from './RewardAnimation';
 
 
 interface StartScreenProps {
-  setScreen: (screen: Screen) => void;
+  onNavigate: (screen: Screen) => void;
   settings: GameSettings;
   onStartGame: () => void;
   lastGameHistory: Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>;
@@ -18,6 +20,9 @@ interface StartScreenProps {
   newlyUnlocked: string[];
   onDismissNotifications: () => void;
   playerRewards: PlayerRewards;
+  previousPlayerRewards: PlayerRewards | undefined;
+  justFinishedGame: boolean;
+  onAnimationComplete: () => void;
 }
 
 const stimulusTypeToChinese = (type: StimulusType) => {
@@ -87,18 +92,23 @@ const AchievementToast: React.FC<{ achievementId: string, onDismiss: () => void 
 };
 
 const RewardPodium: React.FC<{ rewards: PlayerRewards }> = ({ rewards }) => {
+    const animatedStars = useAnimatedCounter(rewards.stars, 1000);
+    const animatedGems = useAnimatedCounter(rewards.gems, 1000);
+    const animatedTrophies = useAnimatedCounter(rewards.trophies, 1000);
+    const animatedPerfectScores = useAnimatedCounter(rewards.perfectScores, 1000);
+    
     const tiers = [
-        { icon: '✨', count: rewards.stars, name: '星星', color: 'from-purple-400 to-purple-600', height: 'h-20' },
-        { icon: '💎', count: rewards.gems, name: '宝石', color: 'from-blue-400 to-blue-600', height: 'h-24' },
-        { icon: '🏆', count: rewards.trophies, name: '奖杯', color: 'from-amber-400 to-amber-600', height: 'h-28' },
-        { icon: '💯', count: rewards.perfectScores, name: '完美', color: 'from-red-400 to-red-600', height: 'h-32' },
+        { icon: '✨', count: animatedStars, name: '星星', color: 'from-purple-400 to-purple-600', height: 'h-20' },
+        { icon: '💎', count: animatedGems, name: '宝石', color: 'from-blue-400 to-blue-600', height: 'h-24' },
+        { icon: '🏆', count: animatedTrophies, name: '奖杯', color: 'from-amber-400 to-amber-600', height: 'h-28' },
+        { icon: '💯', count: animatedPerfectScores, name: '完美', color: 'from-red-400 to-red-600', height: 'h-32' },
     ];
 
     return (
         <div className="w-full max-w-lg p-4 bg-white/80 rounded-xl shadow-lg animate-fade-in">
             <h3 className="font-display text-2xl text-gray-700 mb-4 text-center">我的奖励</h3>
             <div className="flex justify-around items-end text-center text-white space-x-2">
-                {tiers.map((tier, index) => (
+                {tiers.map((tier) => (
                     <div key={tier.name} className="flex-1 flex flex-col items-center justify-end">
                         <div className={`w-full ${tier.height} bg-gradient-to-b ${tier.color} rounded-t-lg flex flex-col items-center justify-center p-1 shadow-md`}>
                             <span className="text-3xl md:text-4xl drop-shadow-lg">{tier.icon}</span>
@@ -113,14 +123,39 @@ const RewardPodium: React.FC<{ rewards: PlayerRewards }> = ({ rewards }) => {
 };
 
 const StartScreen: React.FC<StartScreenProps> = ({ 
-  setScreen, settings, onStartGame, lastGameHistory, isSoundOn, setIsSoundOn, 
+  onNavigate, settings, onStartGame, lastGameHistory, isSoundOn, setIsSoundOn, 
   unlockedAchievementsCount, totalAchievementsCount, newlyUnlocked, onDismissNotifications,
-  playerRewards
+  playerRewards, previousPlayerRewards, justFinishedGame, onAnimationComplete
 }) => {
+  const [isAnimatingRewards, setIsAnimatingRewards] = useState(false);
+  const [rewardsToDisplay, setRewardsToDisplay] = useState(playerRewards);
+
+  const actionButtonsRef = useRef<HTMLDivElement>(null);
+  const rewardPodiumRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Determine if rewards have actually changed
+    const rewardsChanged = justFinishedGame && previousPlayerRewards && 
+      JSON.stringify(playerRewards) !== JSON.stringify(previousPlayerRewards);
+
+    if (rewardsChanged) {
+      setRewardsToDisplay(previousPlayerRewards);
+      setIsAnimatingRewards(true);
+    } else {
+      setRewardsToDisplay(playerRewards);
+    }
+  }, [justFinishedGame, playerRewards, previousPlayerRewards]);
+
+  const handleAnimationFinish = () => {
+    setRewardsToDisplay(playerRewards);
+    setIsAnimatingRewards(false);
+    onAnimationComplete();
+  };
+
 
   const handleNavigation = (screen: Screen) => {
     playSound('click');
-    setScreen(screen);
+    onNavigate(screen);
   };
 
   const handleStartGameClick = () => {
@@ -137,6 +172,13 @@ const StartScreen: React.FC<StartScreenProps> = ({
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in relative">
+       {isAnimatingRewards && (
+        <RewardAnimation
+          startRef={actionButtonsRef}
+          endRef={rewardPodiumRef}
+          onComplete={handleAnimationFinish}
+        />
+      )}
       <div className="absolute top-0 right-0 p-2 z-20 space-y-2">
          {newlyUnlocked.map((id, index) => (
              <AchievementToast key={`${id}-${index}`} achievementId={id} onDismiss={onDismissNotifications} />
@@ -157,7 +199,7 @@ const StartScreen: React.FC<StartScreenProps> = ({
       </p>
 
       {/* Action Buttons */}
-      <div className="grid grid-cols-2 gap-4 w-full max-w-lg mb-8">
+      <div ref={actionButtonsRef} className="grid grid-cols-2 gap-4 w-full max-w-lg mb-8">
         <button
           onClick={handleStartGameClick}
           className="group col-span-2 flex flex-col items-center justify-center p-6 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition-all transform hover:-translate-y-1 active:scale-95"
@@ -185,8 +227,8 @@ const StartScreen: React.FC<StartScreenProps> = ({
       </div>
       
       {/* Reward Podium */}
-      <div className="w-full max-w-lg mb-8">
-        <RewardPodium rewards={playerRewards} />
+      <div ref={rewardPodiumRef} className="w-full max-w-lg mb-8">
+        <RewardPodium rewards={rewardsToDisplay} />
       </div>
       
       {/* Achievements Button */}

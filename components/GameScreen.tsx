@@ -1,14 +1,84 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { GameSettings, Stimulus, StimulusType, GameStats } from '../types';
+import { GameSettings, Stimulus, StimulusType, GameStats, PlayerRewards } from '../types';
 import { useGameLogic } from '../hooks/useGameLogic';
-import { calculateStars } from '../services/rewardService';
+import { calculateStars, processRewards } from '../services/rewardService';
+import { useAnimatedCounter } from '../hooks/useAnimatedCounter';
 import { CheckIcon, XIcon, PauseIcon, HomeIcon, PlayIcon } from './icons';
 import { playSound } from '../services/soundService';
 
+interface GameEndSummaryProps {
+    score: number;
+    rewardsEarned: PlayerRewards;
+    onContinue: () => void;
+}
+
+const RewardCard: React.FC<{ icon: string, count: number, name: string, delay: number }> = ({ icon, count, name, delay }) => {
+    // FIX: The hook now correctly animates from 0 on mount for this component.
+    const animatedCount = useAnimatedCounter(count, 1000);
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setIsVisible(true), delay);
+        return () => clearTimeout(timer);
+    }, [delay]);
+
+    if (count === 0) return null;
+
+    return (
+        <div className={`w-36 bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg text-center transition-all duration-500 transform ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}>
+            <div className="text-5xl mb-2">{icon}</div>
+            <div className="font-bold text-4xl text-gray-800">+{animatedCount}</div>
+            <div className="text-gray-600 font-semibold">{name}</div>
+        </div>
+    );
+};
+
+const GameEndSummary: React.FC<GameEndSummaryProps> = ({ score, rewardsEarned, onContinue }) => {
+    const [sparkles, setSparkles] = useState<Array<{ id: number, top: string, left: string, delay: string }>>([]);
+
+    useEffect(() => {
+        const newSparkles = Array.from({ length: 20 }).map((_, i) => ({
+            id: i,
+            top: `${Math.random() * 100}%`,
+            left: `${Math.random() * 100}%`,
+            delay: `${Math.random() * 1.5}s`,
+        }));
+        setSparkles(newSparkles);
+    }, []);
+
+    return (
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center z-30 animate-fade-in p-4 overflow-hidden">
+            {sparkles.map(s => <div key={s.id} className="sparkle" style={{ top: s.top, left: s.left, animationDelay: s.delay }} />)}
+            
+            <div className="relative text-center text-white">
+                <h2 className="font-display text-5xl mb-2" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>回合结束！</h2>
+                <p className="text-2xl mb-6 font-semibold" style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.5)' }}>最终得分: {score}</p>
+
+                <div className="flex justify-center mb-8">
+                  <div className="flex flex-row flex-wrap justify-center gap-4">
+                      <RewardCard icon="✨" count={rewardsEarned.stars} name="星星" delay={100} />
+                      <RewardCard icon="💎" count={rewardsEarned.gems} name="宝石" delay={300} />
+                      <RewardCard icon="🏆" count={rewardsEarned.trophies} name="奖杯" delay={500} />
+                      <RewardCard icon="💯" count={rewardsEarned.perfectScores} name="完美得分" delay={700} />
+                  </div>
+                </div>
+                
+                <button 
+                    onClick={onContinue}
+                    className="py-3 px-8 bg-green-500 text-white font-bold text-xl rounded-lg shadow-lg hover:bg-green-600 transition transform hover:scale-105 active:scale-100 animate-bounce-in"
+                    style={{ animationDelay: '1200ms' }}
+                >
+                    继续
+                </button>
+            </div>
+        </div>
+    );
+};
 
 interface GameScreenProps {
   settings: GameSettings;
   resources: Stimulus[];
+  playerRewards: PlayerRewards;
   onEndGame: (stats: GameStats, history: Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>) => void;
   onExit: () => void;
 }
@@ -66,13 +136,13 @@ const MiniStimulusDisplay: React.FC<{ stimulus: Stimulus | null; size: number; }
 };
 
 
-const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame, onExit }) => {
+const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, playerRewards, onEndGame, onExit }) => {
   const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
   const [gameState, setGameState] = useState<'ready' | 'playing' | 'over' | 'paused'>('ready');
   const [countdown, setCountdown] = useState(3);
   const [comboDisplay, setComboDisplay] = useState(0);
   const [showComboEffect, setShowComboEffect] = useState(false);
-  const [starsEarned, setStarsEarned] = useState(0);
+  const [gameEndSummaryData, setGameEndSummaryData] = useState<PlayerRewards | null>(null);
 
   const availableStimuli = useMemo(() => {
     if (settings.stimulusType === StimulusType.RANDOM) {
@@ -149,13 +219,13 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
 
   useEffect(() => {
     if (isGameOver) {
+      const starsEarned = calculateStars(gameStats);
+      const wasPerfect = gameStats.incorrectPresses === 0 && gameStats.score > 0 && gameStats.gameCompleted;
+      const summary = processRewards(playerRewards, starsEarned, wasPerfect);
+      setGameEndSummaryData(summary.earned);
       setGameState('over');
-      const earned = calculateStars(gameStats);
-      setStarsEarned(earned);
-      // Give user time to see their stars
-      setTimeout(() => onEndGame(gameStats, scoreHistory), 3000);
     }
-  }, [isGameOver, onEndGame, gameStats, scoreHistory]);
+  }, [isGameOver, gameStats, playerRewards]);
 
   const handlePause = () => {
     playSound('click');
@@ -171,16 +241,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
     playSound('click');
     onExit();
   }
+  
+  const handleContinue = () => {
+    playSound('click');
+    onEndGame(gameStats, scoreHistory);
+  }
 
   const handleUserMatch = (match: boolean) => {
     if (gameState !== 'playing') return;
     handleMatch(match);
-  }
-
-  const getEndGameMessage = () => {
-    if (starsEarned === 3) return "太棒了，你是记忆大师！";
-    if (starsEarned >= 1) return "很棒的成绩！";
-    return "继续努力，下次会更好！";
   }
 
   const getTutorialText = (nLevel: number) => {
@@ -226,6 +295,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
                 </div>
             </div>
         )}
+        
+        {gameState === 'over' && gameEndSummaryData && (
+             <GameEndSummary 
+                score={score}
+                rewardsEarned={gameEndSummaryData}
+                onContinue={handleContinue}
+             />
+        )}
+
 
       <div className="w-full grid grid-cols-5 gap-2 items-center text-center text-base sm:text-lg font-semibold z-10">
          <button onClick={handlePause} className="p-2 rounded-full hover:bg-gray-200 transition active:scale-90 flex justify-center" title="暂停">
@@ -278,18 +356,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ settings, resources, onEndGame,
               </div>
           )}
           
-          {gameState === 'over' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center animate-bounce-in text-center">
-              <h2 className="font-display text-4xl sm:text-5xl text-green-600">{getEndGameMessage()}</h2>
-              <p className="text-2xl mt-2">最终得分: {score}</p>
-               <div className="flex mt-4">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <span key={i} className={`text-5xl transition-all duration-300 transform ${i < starsEarned ? 'text-yellow-400 scale-110' : 'text-gray-300'}`} style={{transitionDelay: `${i * 150}ms`}}>✨</span>
-                ))}
-              </div>
-            </div>
-          )}
-
           {feedback && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className={`rounded-full p-8 ${feedback === 'correct' ? 'bg-green-500/80' : 'bg-red-500/80'} animate-bounce-in`}>
