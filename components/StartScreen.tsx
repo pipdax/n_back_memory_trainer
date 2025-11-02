@@ -5,7 +5,6 @@ import { PlayIcon, CogIcon, CollectionIcon, VolumeUpIcon, VolumeOffIcon, CheckIc
 import { playSound, setSoundEnabled } from '../services/soundService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAnimatedCounter } from '../hooks/useAnimatedCounter';
-import { RewardAnimation } from './RewardAnimation';
 
 
 interface StartScreenProps {
@@ -20,9 +19,7 @@ interface StartScreenProps {
   newlyUnlocked: string[];
   onDismissNotifications: () => void;
   playerRewards: PlayerRewards;
-  previousPlayerRewards: PlayerRewards | undefined;
-  justFinishedGame: boolean;
-  onAnimationComplete: () => void;
+  isProcessingRewards: boolean;
 }
 
 const stimulusTypeToChinese = (type: StimulusType) => {
@@ -125,33 +122,8 @@ const RewardPodium: React.FC<{ rewards: PlayerRewards }> = ({ rewards }) => {
 const StartScreen: React.FC<StartScreenProps> = ({ 
   onNavigate, settings, onStartGame, lastGameHistory, isSoundOn, setIsSoundOn, 
   unlockedAchievementsCount, totalAchievementsCount, newlyUnlocked, onDismissNotifications,
-  playerRewards, previousPlayerRewards, justFinishedGame, onAnimationComplete
+  playerRewards, isProcessingRewards
 }) => {
-  const [isAnimatingRewards, setIsAnimatingRewards] = useState(false);
-  const [rewardsToDisplay, setRewardsToDisplay] = useState(playerRewards);
-
-  const actionButtonsRef = useRef<HTMLDivElement>(null);
-  const rewardPodiumRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Determine if rewards have actually changed
-    const rewardsChanged = justFinishedGame && previousPlayerRewards && 
-      JSON.stringify(playerRewards) !== JSON.stringify(previousPlayerRewards);
-
-    if (rewardsChanged) {
-      setRewardsToDisplay(previousPlayerRewards);
-      setIsAnimatingRewards(true);
-    } else {
-      setRewardsToDisplay(playerRewards);
-    }
-  }, [justFinishedGame, playerRewards, previousPlayerRewards]);
-
-  const handleAnimationFinish = () => {
-    setRewardsToDisplay(playerRewards);
-    setIsAnimatingRewards(false);
-    onAnimationComplete();
-  };
-
 
   const handleNavigation = (screen: Screen) => {
     playSound('click');
@@ -172,13 +144,6 @@ const StartScreen: React.FC<StartScreenProps> = ({
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in relative">
-       {isAnimatingRewards && (
-        <RewardAnimation
-          startRef={actionButtonsRef}
-          endRef={rewardPodiumRef}
-          onComplete={handleAnimationFinish}
-        />
-      )}
       <div className="absolute top-0 right-0 p-2 z-20 space-y-2">
          {newlyUnlocked.map((id, index) => (
              <AchievementToast key={`${id}-${index}`} achievementId={id} onDismiss={onDismissNotifications} />
@@ -189,6 +154,7 @@ const StartScreen: React.FC<StartScreenProps> = ({
         onClick={handleToggleSound} 
         className="absolute top-0 left-0 p-2 text-gray-400 hover:text-gray-700 transition-colors"
         title={isSoundOn ? "静音" : "取消静音"}
+        disabled={isProcessingRewards}
       >
         {isSoundOn ? <VolumeUpIcon className="w-8 h-8"/> : <VolumeOffIcon className="w-8 h-8"/>}
       </button>
@@ -199,10 +165,11 @@ const StartScreen: React.FC<StartScreenProps> = ({
       </p>
 
       {/* Action Buttons */}
-      <div ref={actionButtonsRef} className="grid grid-cols-2 gap-4 w-full max-w-lg mb-8">
+      <div className="grid grid-cols-2 gap-4 w-full max-w-lg mb-8">
         <button
           onClick={handleStartGameClick}
-          className="group col-span-2 flex flex-col items-center justify-center p-6 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition-all transform hover:-translate-y-1 active:scale-95"
+          disabled={isProcessingRewards}
+          className="group col-span-2 flex flex-col items-center justify-center p-6 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <PlayIcon className="w-12 h-12 mb-2" />
           <span className="font-bold text-xl">开始游戏</span>
@@ -210,7 +177,8 @@ const StartScreen: React.FC<StartScreenProps> = ({
         </button>
         <button
           onClick={() => handleNavigation(Screen.SETTINGS)}
-          className="group flex flex-col items-center justify-center p-6 bg-yellow-500 text-white rounded-xl shadow-lg hover:bg-yellow-600 transition-all transform hover:-translate-y-1 active:scale-95"
+          disabled={isProcessingRewards}
+          className="group flex flex-col items-center justify-center p-6 bg-yellow-500 text-white rounded-xl shadow-lg hover:bg-yellow-600 transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <CogIcon className="w-12 h-12 mb-2" />
           <span className="font-bold text-xl">设置</span>
@@ -218,7 +186,8 @@ const StartScreen: React.FC<StartScreenProps> = ({
         </button>
         <button
           onClick={() => handleNavigation(Screen.RESOURCES)}
-          className="group flex flex-col items-center justify-center p-6 bg-purple-500 text-white rounded-xl shadow-lg hover:bg-purple-600 transition-all transform hover:-translate-y-1 active:scale-95"
+          disabled={isProcessingRewards}
+          className="group flex flex-col items-center justify-center p-6 bg-purple-500 text-white rounded-xl shadow-lg hover:bg-purple-600 transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <CollectionIcon className="w-12 h-12 mb-2" />
           <span className="font-bold text-xl">资源库</span>
@@ -227,15 +196,16 @@ const StartScreen: React.FC<StartScreenProps> = ({
       </div>
       
       {/* Reward Podium */}
-      <div ref={rewardPodiumRef} className="w-full max-w-lg mb-8">
-        <RewardPodium rewards={rewardsToDisplay} />
+      <div className="w-full max-w-lg mb-8">
+        <RewardPodium rewards={playerRewards} />
       </div>
       
       {/* Achievements Button */}
       <div className="w-full max-w-lg">
         <button
           onClick={() => handleNavigation(Screen.ACHIEVEMENTS)}
-          className="group w-full flex flex-col items-center justify-center p-6 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all transform hover:-translate-y-1 active:scale-95"
+          disabled={isProcessingRewards}
+          className="group w-full flex flex-col items-center justify-center p-6 bg-blue-500 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <TrophyIcon className="w-12 h-12 mb-2" />
           <span className="font-bold text-xl">成就</span>

@@ -11,7 +11,6 @@ import GameScreen from './components/GameScreen';
 import ResourceBrowser from './components/ResourceBrowser';
 import AchievementsScreen from './components/AchievementsScreen';
 import { playSound, setSoundEnabled } from './services/soundService';
-import { usePrevious } from './hooks/usePrevious';
 
 // Centralized initial state logic. It loads from storage or provides a fresh default state.
 const getInitialState = (): AppState => {
@@ -47,8 +46,7 @@ const App: React.FC = () => {
   const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([]);
   
   // Animation control state
-  const [justFinishedGame, setJustFinishedGame] = useState(false);
-  const previousPlayerRewards = usePrevious(playerRewards);
+  const [isProcessingRewards, setIsProcessingRewards] = useState(false);
 
 
   // Effect to save state to localStorage whenever a key piece of state changes.
@@ -121,6 +119,66 @@ const App: React.FC = () => {
     }
   };
 
+  const applyRewardsWithAnimation = useCallback(async (starsEarned: number, wasPerfect: boolean) => {
+    setIsProcessingRewards(true);
+  
+    // We use a local variable to track the state through the animation,
+    // as the `playerRewards` state variable won't update within this async function's scope.
+    let currentRewards = { ...playerRewards };
+  
+    const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+    const STEP_DELAY = 1200; // Delay between each animation step
+  
+    // Step 1: Add earned stars
+    if (starsEarned > 0) {
+      currentRewards = { ...currentRewards, stars: currentRewards.stars + starsEarned };
+      setPlayerRewards(currentRewards);
+      await delay(STEP_DELAY);
+    }
+  
+    // Step 2: Add gem for perfect score
+    if (wasPerfect) {
+      currentRewards = { ...currentRewards, gems: currentRewards.gems + 1 };
+      setPlayerRewards(currentRewards);
+      await delay(STEP_DELAY);
+    }
+  
+    // Step 3: Cascade convert Stars to Gems, one conversion at a time
+    while (currentRewards.stars >= 10) {
+      currentRewards = {
+        ...currentRewards,
+        stars: currentRewards.stars - 10,
+        gems: currentRewards.gems + 1,
+      };
+      setPlayerRewards(currentRewards);
+      await delay(STEP_DELAY);
+    }
+  
+    // Step 4: Cascade convert Gems to Trophies
+    while (currentRewards.gems >= 10) {
+      currentRewards = {
+        ...currentRewards,
+        gems: currentRewards.gems - 10,
+        trophies: currentRewards.trophies + 1,
+      };
+      setPlayerRewards(currentRewards);
+      await delay(STEP_DELAY);
+    }
+  
+    // Step 5: Cascade convert Trophies to Perfect Scores
+    while (currentRewards.trophies >= 10) {
+      currentRewards = {
+        ...currentRewards,
+        trophies: currentRewards.trophies - 10,
+        perfectScores: currentRewards.perfectScores + 1,
+      };
+      setPlayerRewards(currentRewards);
+      await delay(STEP_DELAY);
+    }
+  
+    setIsProcessingRewards(false);
+  }, [playerRewards]);
+
   const handleGameEnd = (stats: GameStats, history: Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>) => {
     setLastGameHistory(history);
 
@@ -142,13 +200,9 @@ const App: React.FC = () => {
     const wasPerfect = stats.incorrectPresses === 0 && stats.score > 0 && stats.gameCompleted;
     
     if (starsEarned > 0 || wasPerfect) {
-      setPlayerRewards(prevRewards => {
-        const { newTotal } = processRewards(prevRewards, starsEarned, wasPerfect);
-        return newTotal;
-      });
+        applyRewardsWithAnimation(starsEarned, wasPerfect);
     }
 
-    setJustFinishedGame(true);
     setScreen(Screen.START);
   };
   
@@ -168,13 +222,11 @@ const App: React.FC = () => {
 
 
   const handleStartGame = () => {
-    setJustFinishedGame(false);
     setLastGameHistory([]);
     setScreen(Screen.GAME);
   };
   
   const handleNavigate = (screen: Screen) => {
-    setJustFinishedGame(false);
     setScreen(screen);
   }
 
@@ -194,9 +246,7 @@ const App: React.FC = () => {
             newlyUnlocked={newlyUnlocked}
             onDismissNotifications={() => setNewlyUnlocked([])}
             playerRewards={playerRewards}
-            previousPlayerRewards={previousPlayerRewards}
-            justFinishedGame={justFinishedGame}
-            onAnimationComplete={() => setJustFinishedGame(false)}
+            isProcessingRewards={isProcessingRewards}
           />
         );
       case Screen.SETTINGS:

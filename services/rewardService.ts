@@ -33,80 +33,88 @@ export const calculateStars = (stats: GameStats): number => {
 
 /**
  * Processes rewards after a game, calculating earned rewards and new totals.
- * A perfect game awards an additional gem *after* star conversions are calculated.
- *
- * The logic follows these steps:
- * 1. Convert any earned stars (including existing ones) into gems.
- * 2. If the game was perfect, add one bonus gem.
- * 3. Cascade all accumulated gems into trophies.
- * 4. Cascade all accumulated trophies into perfect scores.
+ * This function follows a specific, user-requested order to ensure clarity and correctness:
+ * 1. Add bonus gem for a perfect game.
+ * 2. Add stars earned from the game.
+ * 3. Perform cascading conversions: Stars -> Gems, Gems -> Trophies, Trophies -> Perfect Scores.
  *
  * @param currentRewards The player's rewards before this game.
- * @param starsToAdd The number of stars earned in this game.
+ * @param starsToAdd The number of stars earned directly from game performance.
  * @param wasPerfectScore Whether the player achieved a perfect score.
  * @returns An object containing the rewards earned in this session and the new total rewards.
  */
 export const processRewards = (
-  currentRewards: PlayerRewards, 
-  starsToAdd: number, 
+  currentRewards: PlayerRewards,
+  starsToAdd: number,
   wasPerfectScore: boolean
 ): { earned: PlayerRewards, newTotal: PlayerRewards } => {
-  
-  // Temporary variables to hold totals during calculation
-  let tempStars = currentRewards.stars + starsToAdd;
-  let tempGems = currentRewards.gems;
-  let tempTrophies = currentRewards.trophies;
-  let tempPerfectScores = currentRewards.perfectScores;
-  
-  // Track what's earned in this specific game session
+
+  // --- Initialization ---
+  // Start with the player's current reward totals. These will be updated sequentially.
+  let totalStars = currentRewards.stars;
+  let totalGems = currentRewards.gems;
+  let totalTrophies = currentRewards.trophies;
+  let totalPerfectScores = currentRewards.perfectScores;
+
+  // Track rewards gained purely within this session for the summary screen.
+  // This includes direct earnings (stars, perfect bonus) and conversion earnings.
   let earnedGemsThisSession = 0;
   let earnedTrophiesThisSession = 0;
   let earnedPerfectScoresThisSession = 0;
 
-  // --- Step 1: Handle rewards from star conversion ---
-  if (tempStars >= 10) {
-    const gemsFromStars = Math.floor(tempStars / 10);
-    earnedGemsThisSession += gemsFromStars;
-    tempGems += gemsFromStars;
-    tempStars %= 10;
+  // --- Step 1: Add Direct Gem Earnings (Perfect Score Bonus) ---
+  if (wasPerfectScore) {
+    totalGems += 1;
+    earnedGemsThisSession += 1;
   }
 
-  // --- Step 2: Add bonus gem for a perfect game, AFTER star conversion ---
-  if (wasPerfectScore) {
-      earnedGemsThisSession += 1;
-      tempGems += 1;
+  // --- Step 2: Add Direct Star Earnings ---
+  totalStars += starsToAdd;
+
+  // --- Step 3: Perform Cascading Conversions on the new totals ---
+  
+  // Convert Stars to Gems
+  if (totalStars >= 10) {
+    const gemsFromStars = Math.floor(totalStars / 10);
+    totalGems += gemsFromStars;
+    earnedGemsThisSession += gemsFromStars; // These gems were also "earned" this session
+    totalStars %= 10; // Remainder becomes the new star total
   }
   
-  // --- Step 3: Cascade all accumulated gems and trophies upwards ---
-  
-  // Cascade gems to trophies
-  if (tempGems >= 10) {
-    const trophiesFromGems = Math.floor(tempGems / 10);
-    earnedTrophiesThisSession += trophiesFromGems;
-    tempTrophies += trophiesFromGems;
-    tempGems %= 10;
+  // Convert Gems to Trophies
+  if (totalGems >= 10) {
+    const trophiesFromGems = Math.floor(totalGems / 10);
+    totalTrophies += trophiesFromGems;
+    earnedTrophiesThisSession += trophiesFromGems; // Trophies "earned" from gem conversion
+    totalGems %= 10;
   }
   
-  // Cascade trophies to perfect scores
-  if (tempTrophies >= 10) {
-      const perfectFromTrophies = Math.floor(tempTrophies / 10);
-      earnedPerfectScoresThisSession += perfectFromTrophies;
-      tempPerfectScores += perfectFromTrophies;
-      tempTrophies %= 10;
+  // Convert Trophies to Perfect Scores (💯)
+  if (totalTrophies >= 10) {
+      const perfectFromTrophies = Math.floor(totalTrophies / 10);
+      totalPerfectScores += perfectFromTrophies;
+      earnedPerfectScoresThisSession += perfectFromTrophies; // Perfect Scores "earned" from trophy conversion
+      totalTrophies %= 10;
   }
+  
+  // The 'earned' object is for the summary screen. It should show what the player gained.
+  const earnedRewards: PlayerRewards = {
+    stars: starsToAdd, // The summary should always show the direct stars won.
+    gems: earnedGemsThisSession,
+    trophies: earnedTrophiesThisSession,
+    perfectScores: earnedPerfectScoresThisSession,
+  };
+
+  // The 'newTotal' object is the final state to be saved.
+  const newTotalRewards: PlayerRewards = {
+    stars: totalStars,
+    gems: totalGems,
+    trophies: totalTrophies,
+    perfectScores: totalPerfectScores,
+  };
   
   return {
-    earned: { 
-      stars: starsToAdd, 
-      gems: earnedGemsThisSession, 
-      trophies: earnedTrophiesThisSession, 
-      perfectScores: earnedPerfectScoresThisSession
-    },
-    newTotal: { 
-      stars: tempStars, 
-      gems: tempGems, 
-      trophies: tempTrophies, 
-      perfectScores: tempPerfectScores 
-    }
+    earned: earnedRewards,
+    newTotal: newTotalRewards,
   };
 };
