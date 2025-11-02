@@ -1,29 +1,44 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { GameSettings, Stimulus, Screen, PlayerRewards, UnlockedAchievements, GameStats } from './types';
+import { GameSettings, Screen, PlayerRewards, UnlockedAchievements, GameStats } from './types';
 import { DEFAULT_SETTINGS, INITIAL_RESOURCES } from './constants';
 import { ALL_ACHIEVEMENTS } from './achievements';
 import { checkAchievements } from './services/achievementService';
 import { calculateStars, processRewards } from './services/rewardService';
-import { loadState, saveState } from './services/storageService';
+import { loadState, saveState, AppState } from './services/storageService';
 import StartScreen from './components/StartScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GameScreen from './components/GameScreen';
 import ResourceBrowser from './components/ResourceBrowser';
 import AchievementsScreen from './components/AchievementsScreen';
-import { DownloadIcon, UploadIcon } from './components/icons';
 import { playSound, setSoundEnabled } from './services/soundService';
 import { usePrevious } from './hooks/usePrevious';
 
+// Centralized initial state logic. It loads from storage or provides a fresh default state.
+const getInitialState = (): AppState => {
+  const loadedState = loadState();
+  if (loadedState) {
+    return loadedState;
+  }
+  // Return a complete default state if nothing is loaded
+  return {
+    settings: DEFAULT_SETTINGS,
+    resources: INITIAL_RESOURCES,
+    playerRewards: { stars: 0, gems: 0, trophies: 0, perfectScores: 0 },
+    unlockedAchievements: {},
+    isSoundOn: true,
+  };
+};
 
 const App: React.FC = () => {
+  // Load initial state only once.
+  const [initialState] = useState(getInitialState);
+
   const [screen, setScreen] = useState<Screen>(Screen.START);
-  
-  // Load initial state from localStorage or use defaults
-  const [settings, setSettings] = useState<GameSettings>(() => loadState()?.settings || DEFAULT_SETTINGS);
-  const [resources, setResources] = useState<Stimulus[]>(() => loadState()?.resources || INITIAL_RESOURCES);
-  const [playerRewards, setPlayerRewards] = useState<PlayerRewards>(() => loadState()?.playerRewards || { stars: 0, gems: 0, trophies: 0, perfectScores: 0 });
-  const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievements>(() => loadState()?.unlockedAchievements || {});
-  const [isSoundOn, setIsSoundOn] = useState<boolean>(() => loadState()?.isSoundOn ?? true);
+  const [settings, setSettings] = useState<GameSettings>(initialState.settings);
+  const [resources, setResources] = useState(initialState.resources);
+  const [playerRewards, setPlayerRewards] = useState<PlayerRewards>(initialState.playerRewards);
+  const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievements>(initialState.unlockedAchievements);
+  const [isSoundOn, setIsSoundOn] = useState<boolean>(initialState.isSoundOn);
   
   const [lastGameHistory, setLastGameHistory] = useState<Array<{ turn: number; score: number; result: 'correct' | 'incorrect' | 'neutral' }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -36,15 +51,16 @@ const App: React.FC = () => {
   const previousPlayerRewards = usePrevious(playerRewards);
 
 
-  // Effect to save state to localStorage whenever it changes
+  // Effect to save state to localStorage whenever a key piece of state changes.
   useEffect(() => {
-    saveState({
+    const currentState: AppState = {
       settings,
       resources,
       playerRewards,
       unlockedAchievements,
       isSoundOn,
-    });
+    };
+    saveState(currentState);
   }, [settings, resources, playerRewards, unlockedAchievements, isSoundOn]);
 
   useEffect(() => {
@@ -54,13 +70,9 @@ const App: React.FC = () => {
   const handleExport = useCallback(() => {
     playSound('click');
     try {
-      const dataToExport = JSON.stringify({
-        settings,
-        resources,
-        unlockedAchievements,
-        playerRewards,
-        isSoundOn,
-      }, null, 2);
+      // We read from localStorage directly to get the versioned wrapper.
+      const rawData = localStorage.getItem('n-back-game-data');
+      const dataToExport = JSON.stringify(JSON.parse(rawData || '{}'), null, 2);
       const blob = new Blob([dataToExport], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -74,7 +86,7 @@ const App: React.FC = () => {
       console.error('Failed to export data:', error);
       alert('导出数据失败。请查看控制台了解详情。');
     }
-  }, [settings, resources, unlockedAchievements, playerRewards, isSoundOn]);
+  }, []);
 
   const handleImportClick = () => {
     playSound('click');
@@ -90,20 +102,14 @@ const App: React.FC = () => {
       try {
         const text = e.target?.result;
         if (typeof text !== 'string') throw new Error('Invalid file content');
-        const data = JSON.parse(text);
         
-        // Validate imported data structure before setting state
-        if (data.settings && data.resources) {
-          setSettings(data.settings);
-          setResources(data.resources);
-          if(data.unlockedAchievements) setUnlockedAchievements(data.unlockedAchievements);
-          if(data.playerRewards) setPlayerRewards(data.playerRewards);
-          if(typeof data.isSoundOn === 'boolean') setIsSoundOn(data.isSoundOn);
-          alert('游戏数据导入成功！');
-          setScreen(Screen.START);
-        } else {
-          throw new Error('Invalid data structure in JSON file.');
-        }
+        // Save the raw imported data to localStorage. Our robust loadState will handle it on next load.
+        localStorage.setItem('n-back-game-data', text);
+
+        alert('游戏数据导入成功！应用将重新加载以应用更改。');
+        // A full reload is the safest way to ensure all components re-initialize with the new state.
+        window.location.reload(); 
+        
       } catch (error) {
         console.error('Failed to import data:', error);
         alert('导入数据失败。请检查文件格式。');
@@ -173,68 +179,80 @@ const App: React.FC = () => {
   }
 
   const renderScreen = () => {
-    switch (screen) {
-      case Screen.SETTINGS:
-        return <SettingsScreen 
-                  settings={settings} 
-                  setSettings={setSettings} 
-                  onBack={() => handleNavigate(Screen.START)} 
-                  onClearAllProgress={handleClearAllProgress}
-                />;
-      case Screen.GAME:
-        return <GameScreen 
-          settings={settings} 
-          resources={resources} 
-          playerRewards={playerRewards}
-          onEndGame={handleGameEnd}
-          onExit={() => handleNavigate(Screen.START)} 
-        />;
-      case Screen.RESOURCES:
-        return <ResourceBrowser resources={resources} setResources={setResources} onBack={() => handleNavigate(Screen.START)} onAIFetch={handleAIFetch}/>;
-      case Screen.ACHIEVEMENTS:
-        return <AchievementsScreen unlockedAchievements={unlockedAchievements} onBack={() => handleNavigate(Screen.START)} />;
+    switch(screen) {
       case Screen.START:
+        return (
+          <StartScreen 
+            onNavigate={handleNavigate}
+            onStartGame={handleStartGame}
+            settings={settings}
+            lastGameHistory={lastGameHistory}
+            isSoundOn={isSoundOn}
+            setIsSoundOn={setIsSoundOn}
+            unlockedAchievementsCount={Object.keys(unlockedAchievements).length}
+            totalAchievementsCount={ALL_ACHIEVEMENTS.length}
+            newlyUnlocked={newlyUnlocked}
+            onDismissNotifications={() => setNewlyUnlocked([])}
+            playerRewards={playerRewards}
+            previousPlayerRewards={previousPlayerRewards}
+            justFinishedGame={justFinishedGame}
+            onAnimationComplete={() => setJustFinishedGame(false)}
+          />
+        );
+      case Screen.SETTINGS:
+        return (
+          <SettingsScreen 
+            settings={settings}
+            setSettings={setSettings}
+            onBack={() => handleNavigate(Screen.START)}
+            onClearAllProgress={handleClearAllProgress}
+            onExport={handleExport}
+            onImportClick={handleImportClick}
+          />
+        );
+      case Screen.GAME:
+        return (
+          <GameScreen
+            settings={settings}
+            resources={resources}
+            playerRewards={playerRewards}
+            onEndGame={handleGameEnd}
+            onExit={() => handleNavigate(Screen.START)}
+          />
+        );
+      case Screen.RESOURCES:
+        return (
+            <ResourceBrowser 
+                resources={resources}
+                setResources={setResources}
+                onBack={() => handleNavigate(Screen.START)}
+                onAIFetch={handleAIFetch}
+            />
+        );
+      case Screen.ACHIEVEMENTS:
+        return (
+            <AchievementsScreen 
+                unlockedAchievements={unlockedAchievements}
+                onBack={() => handleNavigate(Screen.START)}
+            />
+        );
       default:
-        return <StartScreen 
-                  onNavigate={handleNavigate}
-                  settings={settings} 
-                  onStartGame={handleStartGame}
-                  lastGameHistory={lastGameHistory}
-                  isSoundOn={isSoundOn}
-                  setIsSoundOn={setIsSoundOn}
-                  unlockedAchievementsCount={Object.keys(unlockedAchievements).length}
-                  totalAchievementsCount={ALL_ACHIEVEMENTS.length}
-                  newlyUnlocked={newlyUnlocked}
-                  onDismissNotifications={() => setNewlyUnlocked([])}
-                  playerRewards={playerRewards}
-                  previousPlayerRewards={previousPlayerRewards}
-                  justFinishedGame={justFinishedGame}
-                  onAnimationComplete={() => setJustFinishedGame(false)}
-                />;
+        return null;
     }
-  };
+  }
 
   return (
-    <div className="bg-gradient-to-br from-blue-100 to-purple-200 min-h-screen text-gray-800 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-2xl mx-auto bg-white/70 backdrop-blur-xl rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 flex flex-col min-h-[90vh]">
-        <header className="flex justify-between items-center pb-4 border-b-2 border-purple-200">
-            <h1 className="font-display text-2xl sm:text-4xl text-purple-700 tracking-wider">
-                记忆力训练
-            </h1>
-            <div className="flex items-center space-x-2">
-                <button onClick={handleExport} className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-transform transform hover:scale-110 active:scale-95" title="导出进度">
-                    <DownloadIcon />
-                </button>
-                <input type="file" ref={fileInputRef} onChange={handleImport} accept=".json" className="hidden" />
-                <button onClick={handleImportClick} className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-transform transform hover:scale-110 active:scale-95" title="导入进度">
-                    <UploadIcon />
-                </button>
-            </div>
-        </header>
-        <main className="flex-grow flex flex-col justify-center">
+    <div className="h-screen w-screen bg-gray-50 overflow-hidden">
+        <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImport}
+            className="hidden"
+            accept="application/json"
+        />
+        <main className="container mx-auto h-full p-4 relative">
             {renderScreen()}
         </main>
-      </div>
     </div>
   );
 };
