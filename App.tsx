@@ -28,6 +28,8 @@ const getInitialState = (): AppState => {
   };
 };
 
+type RewardType = keyof PlayerRewards;
+
 const App: React.FC = () => {
   // Load initial state only once.
   const [initialState] = useState(getInitialState);
@@ -220,6 +222,39 @@ const App: React.FC = () => {
     setUnlockedAchievements({});
   };
 
+  const handleRewardPodiumClick = useCallback((rewardType: RewardType) => {
+    if (isProcessingRewards) return;
+  
+    playSound('achievement');
+  
+    // Use functional update to avoid stale state issues.
+    setPlayerRewards(currentRewards => {
+      let newRewards = { ...currentRewards, [rewardType]: currentRewards[rewardType] + 1 };
+  
+      // Cascade rewards without animation. This is a synchronous state update.
+      // Stars -> Gems
+      if (newRewards.stars >= 10) {
+        const gemsFromStars = Math.floor(newRewards.stars / 10);
+        newRewards.gems += gemsFromStars;
+        newRewards.stars %= 10;
+      }
+      // Gems -> Trophies
+      if (newRewards.gems >= 10) {
+        const trophiesFromGems = Math.floor(newRewards.gems / 10);
+        newRewards.trophies += trophiesFromGems;
+        newRewards.gems %= 10;
+      }
+      // Trophies -> Perfect Scores
+      if (newRewards.trophies >= 10) {
+        const perfectFromTrophies = Math.floor(newRewards.trophies / 10);
+        newRewards.perfectScores += perfectFromTrophies;
+        newRewards.trophies %= 10;
+      }
+  
+      return newRewards;
+    });
+  }, [isProcessingRewards]);
+
 
   const handleStartGame = () => {
     setLastGameHistory([]);
@@ -247,6 +282,7 @@ const App: React.FC = () => {
             onDismissNotifications={() => setNewlyUnlocked([])}
             playerRewards={playerRewards}
             isProcessingRewards={isProcessingRewards}
+            onRewardClick={handleRewardPodiumClick}
           />
         );
       case Screen.SETTINGS:

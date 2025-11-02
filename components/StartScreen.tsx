@@ -20,6 +20,7 @@ interface StartScreenProps {
   onDismissNotifications: () => void;
   playerRewards: PlayerRewards;
   isProcessingRewards: boolean;
+  onRewardClick: (rewardType: keyof PlayerRewards) => void;
 }
 
 const stimulusTypeToChinese = (type: StimulusType) => {
@@ -88,17 +89,51 @@ const AchievementToast: React.FC<{ achievementId: string, onDismiss: () => void 
     );
 };
 
-const RewardPodium: React.FC<{ rewards: PlayerRewards }> = ({ rewards }) => {
+interface RewardPodiumProps {
+  rewards: PlayerRewards;
+  onRewardClick: (rewardType: keyof PlayerRewards) => void;
+  isDisabled: boolean;
+}
+
+const RewardPodium: React.FC<RewardPodiumProps> = ({ rewards, onRewardClick, isDisabled }) => {
     const animatedStars = useAnimatedCounter(rewards.stars, 1000);
     const animatedGems = useAnimatedCounter(rewards.gems, 1000);
     const animatedTrophies = useAnimatedCounter(rewards.trophies, 1000);
     const animatedPerfectScores = useAnimatedCounter(rewards.perfectScores, 1000);
+
+    const clickStateRef = useRef({
+      counts: { stars: 0, gems: 0, trophies: 0, perfectScores: 0 },
+      lastClick: { stars: 0, gems: 0, trophies: 0, perfectScores: 0 },
+    });
+    
+    const CLICK_THRESHOLD = 6;
+    const TIMEOUT_MS = 2000;
+
+    const handleTierClick = (rewardType: keyof PlayerRewards) => {
+      if (isDisabled) return;
+
+      const now = Date.now();
+      const state = clickStateRef.current;
+      const lastClickTime = state.lastClick[rewardType];
+      
+      if (now - lastClickTime > TIMEOUT_MS) {
+        state.counts[rewardType] = 1;
+      } else {
+        state.counts[rewardType]++;
+      }
+      state.lastClick[rewardType] = now;
+
+      if (state.counts[rewardType] === CLICK_THRESHOLD) {
+        onRewardClick(rewardType);
+        state.counts[rewardType] = 0;
+      }
+    };
     
     const tiers = [
-        { icon: '✨', count: animatedStars, name: '星星', color: 'from-purple-400 to-purple-600', height: 'h-20' },
-        { icon: '💎', count: animatedGems, name: '宝石', color: 'from-blue-400 to-blue-600', height: 'h-24' },
-        { icon: '🏆', count: animatedTrophies, name: '奖杯', color: 'from-amber-400 to-amber-600', height: 'h-28' },
-        { icon: '💯', count: animatedPerfectScores, name: '完美', color: 'from-red-400 to-red-600', height: 'h-32' },
+        { key: 'stars' as keyof PlayerRewards, icon: '✨', count: animatedStars, name: '星星', color: 'from-purple-400 to-purple-600', height: 'h-20' },
+        { key: 'gems' as keyof PlayerRewards, icon: '💎', count: animatedGems, name: '宝石', color: 'from-blue-400 to-blue-600', height: 'h-24' },
+        { key: 'trophies' as keyof PlayerRewards, icon: '🏆', count: animatedTrophies, name: '奖杯', color: 'from-amber-400 to-amber-600', height: 'h-28' },
+        { key: 'perfectScores' as keyof PlayerRewards, icon: '💯', count: animatedPerfectScores, name: '完美', color: 'from-red-400 to-red-600', height: 'h-32' },
     ];
 
     return (
@@ -106,8 +141,12 @@ const RewardPodium: React.FC<{ rewards: PlayerRewards }> = ({ rewards }) => {
             <h3 className="font-display text-2xl text-gray-700 mb-4 text-center">我的奖励</h3>
             <div className="flex justify-around items-end text-center text-white space-x-2">
                 {tiers.map((tier) => (
-                    <div key={tier.name} className="flex-1 flex flex-col items-center justify-end">
-                        <div className={`w-full ${tier.height} bg-gradient-to-b ${tier.color} rounded-t-lg flex flex-col items-center justify-center p-1 shadow-md`}>
+                    <div 
+                        key={tier.name} 
+                        className="flex-1 flex flex-col items-center justify-end"
+                        onClick={() => handleTierClick(tier.key)}
+                    >
+                        <div className={`w-full ${tier.height} bg-gradient-to-b ${tier.color} rounded-t-lg flex flex-col items-center justify-center p-1 shadow-md transition-transform duration-150 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 active:scale-95'}`}>
                             <span className="text-3xl md:text-4xl drop-shadow-lg">{tier.icon}</span>
                             <span className="text-xl md:text-2xl font-bold drop-shadow-md">{tier.count}</span>
                             <span className="text-xs font-semibold hidden sm:block">{tier.name}</span>
@@ -122,7 +161,7 @@ const RewardPodium: React.FC<{ rewards: PlayerRewards }> = ({ rewards }) => {
 const StartScreen: React.FC<StartScreenProps> = ({ 
   onNavigate, settings, onStartGame, lastGameHistory, isSoundOn, setIsSoundOn, 
   unlockedAchievementsCount, totalAchievementsCount, newlyUnlocked, onDismissNotifications,
-  playerRewards, isProcessingRewards
+  playerRewards, isProcessingRewards, onRewardClick
 }) => {
 
   const handleNavigation = (screen: Screen) => {
@@ -197,7 +236,11 @@ const StartScreen: React.FC<StartScreenProps> = ({
       
       {/* Reward Podium */}
       <div className="w-full max-w-lg mb-8">
-        <RewardPodium rewards={playerRewards} />
+        <RewardPodium 
+          rewards={playerRewards}
+          onRewardClick={onRewardClick}
+          isDisabled={isProcessingRewards}
+        />
       </div>
       
       {/* Achievements Button */}
