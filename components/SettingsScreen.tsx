@@ -128,6 +128,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, setSettings, 
             />
           </div>
         </div>
+        
+        <div className="mt-8">
+            <button
+              onClick={handleBack}
+              className="w-full py-3 bg-green-500 text-white font-bold text-lg rounded-lg shadow-md hover:bg-green-600 transition transform hover:scale-105 active:scale-100"
+            >
+              保存并返回
+            </button>
+        </div>
 
         <div className="my-6 py-6 border-t-2 border-dashed border-gray-300">
             <h3 className="text-lg font-semibold text-gray-700 mb-2 text-center">数据管理</h3>
@@ -161,15 +170,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ settings, setSettings, 
                 一键清除所有奖励和成就
             </button>
         </div>
-      </div>
-
-      <div className="mt-auto pt-4 flex-shrink-0">
-        <button
-          onClick={handleBack}
-          className="w-full py-3 bg-green-500 text-white font-bold text-lg rounded-lg shadow-md hover:bg-green-600 transition transform hover:scale-105 active:scale-100"
-        >
-          保存并返回
-        </button>
       </div>
     </div>
   );
