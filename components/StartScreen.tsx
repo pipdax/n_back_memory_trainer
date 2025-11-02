@@ -107,7 +107,7 @@ const RewardPodium: React.FC<RewardPodiumProps> = ({ rewards, onRewardClick, isD
     });
     
     const CLICK_THRESHOLD = 6;
-    const TIMEOUT_MS = 2000;
+    const TIMEOUT_MS = 1000;
 
     const handleTierClick = (rewardType: keyof PlayerRewards) => {
       if (isDisabled) return;
