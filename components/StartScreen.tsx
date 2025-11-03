@@ -21,6 +21,7 @@ interface StartScreenProps {
   playerRewards: PlayerRewards;
   isProcessingRewards: boolean;
   onRewardClick: (rewardType: keyof PlayerRewards) => void;
+  tierRefs: { [key in keyof PlayerRewards]: React.RefObject<HTMLDivElement> };
 }
 
 const stimulusTypeToChinese = (type: StimulusType) => {
@@ -93,9 +94,10 @@ interface RewardPodiumProps {
   rewards: PlayerRewards;
   onRewardClick: (rewardType: keyof PlayerRewards) => void;
   isDisabled: boolean;
+  tierRefs: { [key in keyof PlayerRewards]: React.RefObject<HTMLDivElement> };
 }
 
-const RewardPodium: React.FC<RewardPodiumProps> = ({ rewards, onRewardClick, isDisabled }) => {
+const RewardPodium: React.FC<RewardPodiumProps> = ({ rewards, onRewardClick, isDisabled, tierRefs }) => {
     const animatedStars = useAnimatedCounter(rewards.stars, 1000);
     const animatedGems = useAnimatedCounter(rewards.gems, 1000);
     const animatedTrophies = useAnimatedCounter(rewards.trophies, 1000);
@@ -130,10 +132,10 @@ const RewardPodium: React.FC<RewardPodiumProps> = ({ rewards, onRewardClick, isD
     };
     
     const tiers = [
-        { key: 'stars' as keyof PlayerRewards, icon: '✨', count: animatedStars, name: '星星', color: 'from-purple-400 to-purple-600', height: 'h-20' },
-        { key: 'gems' as keyof PlayerRewards, icon: '💎', count: animatedGems, name: '宝石', color: 'from-blue-400 to-blue-600', height: 'h-24' },
-        { key: 'trophies' as keyof PlayerRewards, icon: '🏆', count: animatedTrophies, name: '奖杯', color: 'from-amber-400 to-amber-600', height: 'h-28' },
-        { key: 'perfectScores' as keyof PlayerRewards, icon: '💯', count: animatedPerfectScores, name: '完美', color: 'from-red-400 to-red-600', height: 'h-32' },
+        { key: 'stars' as keyof PlayerRewards, ref: tierRefs.stars, icon: '✨', count: animatedStars, name: '星星', color: 'from-purple-400 to-purple-600', height: 'h-20' },
+        { key: 'gems' as keyof PlayerRewards, ref: tierRefs.gems, icon: '💎', count: animatedGems, name: '宝石', color: 'from-blue-400 to-blue-600', height: 'h-24' },
+        { key: 'trophies' as keyof PlayerRewards, ref: tierRefs.trophies, icon: '🏆', count: animatedTrophies, name: '奖杯', color: 'from-amber-400 to-amber-600', height: 'h-28' },
+        { key: 'perfectScores' as keyof PlayerRewards, ref: tierRefs.perfectScores, icon: '💯', count: animatedPerfectScores, name: '完美', color: 'from-red-400 to-red-600', height: 'h-32' },
     ];
 
     return (
@@ -143,6 +145,7 @@ const RewardPodium: React.FC<RewardPodiumProps> = ({ rewards, onRewardClick, isD
                 {tiers.map((tier) => (
                     <div 
                         key={tier.name} 
+                        ref={tier.ref}
                         className="flex-1 flex flex-col items-center justify-end"
                         onClick={() => handleTierClick(tier.key)}
                     >
@@ -161,7 +164,7 @@ const RewardPodium: React.FC<RewardPodiumProps> = ({ rewards, onRewardClick, isD
 const StartScreen: React.FC<StartScreenProps> = ({ 
   onNavigate, settings, onStartGame, lastGameHistory, isSoundOn, setIsSoundOn, 
   unlockedAchievementsCount, totalAchievementsCount, newlyUnlocked, onDismissNotifications,
-  playerRewards, isProcessingRewards, onRewardClick
+  playerRewards, isProcessingRewards, onRewardClick, tierRefs
 }) => {
 
   const handleNavigation = (screen: Screen) => {
@@ -240,6 +243,7 @@ const StartScreen: React.FC<StartScreenProps> = ({
           rewards={playerRewards}
           onRewardClick={onRewardClick}
           isDisabled={isProcessingRewards}
+          tierRefs={tierRefs}
         />
       </div>
       

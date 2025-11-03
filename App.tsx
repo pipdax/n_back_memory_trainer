@@ -10,6 +10,7 @@ import SettingsScreen from './components/SettingsScreen';
 import GameScreen from './components/GameScreen';
 import ResourceBrowser from './components/ResourceBrowser';
 import AchievementsScreen from './components/AchievementsScreen';
+import RewardAnimation from './components/RewardAnimation';
 import { playSound, setSoundEnabled } from './services/soundService';
 
 // Centralized initial state logic. It loads from storage or provides a fresh default state.
@@ -49,6 +50,7 @@ const App: React.FC = () => {
   
   // Animation control state
   const [isProcessingRewards, setIsProcessingRewards] = useState(false);
+  const [animationConfig, setAnimationConfig] = useState<{ startKey: RewardType; endKey: RewardType; key: number } | null>(null);
 
 
   // Effect to save state to localStorage whenever a key piece of state changes.
@@ -66,6 +68,15 @@ const App: React.FC = () => {
   useEffect(() => {
     setSoundEnabled(isSoundOn);
   }, [isSoundOn]);
+
+  const tierRefs = {
+    stars: useRef<HTMLDivElement>(null),
+    gems: useRef<HTMLDivElement>(null),
+    trophies: useRef<HTMLDivElement>(null),
+    perfectScores: useRef<HTMLDivElement>(null),
+  };
+  
+  const animationPromiseResolve = useRef<(() => void) | null>(null);
 
   const handleExport = useCallback(() => {
     playSound('click');
@@ -121,63 +132,72 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAnimationComplete = () => {
+    if (animationPromiseResolve.current) {
+      animationPromiseResolve.current();
+      animationPromiseResolve.current = null;
+    }
+    setAnimationConfig(null);
+  };
+
+  const runAnimation = (startKey: RewardType, endKey: RewardType) => {
+    playSound('combo');
+    return new Promise<void>((resolve) => {
+      animationPromiseResolve.current = resolve;
+      setAnimationConfig({
+        startKey,
+        endKey,
+        key: Date.now(),
+      });
+    });
+  };
+
   const applyRewardsWithAnimation = useCallback(async (starsEarned: number, wasPerfect: boolean) => {
     setIsProcessingRewards(true);
-  
-    // We use a local variable to track the state through the animation,
-    // as the `playerRewards` state variable won't update within this async function's scope.
     let currentRewards = { ...playerRewards };
-  
-    const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-    const STEP_DELAY = 1200; // Delay between each animation step
-  
+    const NUMBER_ROLL_DURATION = 1000;
+
     // Step 1: Add earned stars
     if (starsEarned > 0) {
       currentRewards = { ...currentRewards, stars: currentRewards.stars + starsEarned };
       setPlayerRewards(currentRewards);
-      await delay(STEP_DELAY);
+      await new Promise(res => setTimeout(res, NUMBER_ROLL_DURATION));
     }
-  
+
     // Step 2: Add gem for perfect score
     if (wasPerfect) {
       currentRewards = { ...currentRewards, gems: currentRewards.gems + 1 };
       setPlayerRewards(currentRewards);
-      await delay(STEP_DELAY);
+      await new Promise(res => setTimeout(res, NUMBER_ROLL_DURATION));
     }
-  
+
     // Step 3: Cascade convert Stars to Gems, one conversion at a time
     while (currentRewards.stars >= 10) {
-      currentRewards = {
-        ...currentRewards,
-        stars: currentRewards.stars - 10,
-        gems: currentRewards.gems + 1,
-      };
-      setPlayerRewards(currentRewards);
-      await delay(STEP_DELAY);
+      const animationPromise = runAnimation('stars', 'gems');
+      setPlayerRewards(prev => ({ ...prev, stars: prev.stars - 10, gems: prev.gems + 1, }));
+      currentRewards.stars -= 10;
+      currentRewards.gems += 1;
+      await animationPromise;
     }
-  
+
     // Step 4: Cascade convert Gems to Trophies
     while (currentRewards.gems >= 10) {
-      currentRewards = {
-        ...currentRewards,
-        gems: currentRewards.gems - 10,
-        trophies: currentRewards.trophies + 1,
-      };
-      setPlayerRewards(currentRewards);
-      await delay(STEP_DELAY);
+      const animationPromise = runAnimation('gems', 'trophies');
+      setPlayerRewards(prev => ({ ...prev, gems: prev.gems - 10, trophies: prev.trophies + 1, }));
+      currentRewards.gems -= 10;
+      currentRewards.trophies += 1;
+      await animationPromise;
     }
-  
+
     // Step 5: Cascade convert Trophies to Perfect Scores
     while (currentRewards.trophies >= 10) {
-      currentRewards = {
-        ...currentRewards,
-        trophies: currentRewards.trophies - 10,
-        perfectScores: currentRewards.perfectScores + 1,
-      };
-      setPlayerRewards(currentRewards);
-      await delay(STEP_DELAY);
+      const animationPromise = runAnimation('trophies', 'perfectScores');
+      setPlayerRewards(prev => ({ ...prev, trophies: prev.trophies - 10, perfectScores: prev.perfectScores + 1, }));
+      currentRewards.trophies -= 10;
+      currentRewards.perfectScores += 1;
+      await animationPromise;
     }
-  
+
     setIsProcessingRewards(false);
   }, [playerRewards]);
 
@@ -283,6 +303,7 @@ const App: React.FC = () => {
             playerRewards={playerRewards}
             isProcessingRewards={isProcessingRewards}
             onRewardClick={handleRewardPodiumClick}
+            tierRefs={tierRefs}
           />
         );
       case Screen.SETTINGS:
@@ -337,6 +358,14 @@ const App: React.FC = () => {
             accept="application/json"
         />
         <main className="container mx-auto h-full p-4 relative">
+            {animationConfig && (
+              <RewardAnimation
+                key={animationConfig.key}
+                startRef={tierRefs[animationConfig.startKey]}
+                endRef={tierRefs[animationConfig.endKey]}
+                onComplete={handleAnimationComplete}
+              />
+            )}
             {renderScreen()}
         </main>
     </div>
